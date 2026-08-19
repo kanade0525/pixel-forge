@@ -66,6 +66,3 @@ sRGB(8bit) → 線形RGB → XYZ(sRGB/D65 行列) → **CIELAB**。
 「Game Boy」「Game Boy Advance」「Super Nintendo」等は任天堂、「PICO-8」は
 Lexaloffle Games LLC の商標です。本ツールはこれら各社と提携・公認関係にありません。
 パレット名は識別のための記述的表示として用いています。
-
-UI スタイルに [system.css](https://github.com/sakofchit/system.css)（MIT License,
-© 2022 Sakun Acharige）を使用しています。詳細は [THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md) を参照。

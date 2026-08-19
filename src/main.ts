@@ -1,4 +1,3 @@
-import '@sakun/system.css/dist/system.css'
 import './style.css'
 import type { ConvertOptions, DitherMode, DownscaleMode, BayerSize, Palette, PixelImage } from './types'
 import { PALETTES, getPalette, hexToPaletteColor } from './palettes/palettes'
