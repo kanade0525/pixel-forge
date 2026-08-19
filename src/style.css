@@ -358,6 +358,20 @@ details summary {
   outline-offset: 1px;
 }
 
+/* 編集エリアのパレット（描く色の候補） */
+.editor-palette {
+  margin-bottom: 8px;
+}
+.editor-palette-label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.editor-palette .swatches {
+  margin: 0;
+}
+
 /* プレビュー */
 .preview-grid {
   display: grid;

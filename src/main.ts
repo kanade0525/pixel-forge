@@ -21,6 +21,7 @@ const paletteSelect = $<HTMLSelectElement>('paletteSelect')
 const adaptiveRow = $('adaptiveRow')
 const adaptiveCount = $<HTMLSelectElement>('adaptiveCount')
 const swatches = $('swatches')
+const editorSwatches = $('editorSwatches')
 const addColorBtn = $<HTMLButtonElement>('addColor')
 const customPaletteText = $<HTMLTextAreaElement>('customPalette')
 // エディタ（レタッチ）
@@ -74,6 +75,7 @@ let tool: Tool = 'pencil'
 let paint = { r: 0, g: 0, b: 0 } // 描く色
 let showGrid = false
 let painting = false
+let paintInitialized = false
 let lastPx = -1
 let lastPy = -1
 const undoStack: Uint8ClampedArray[] = []
@@ -146,14 +148,39 @@ function setPaintColor(r: number, g: number, b: number): void {
   if (cur) renderSwatchesActiveOnly(cur)
 }
 
-// スウォッチの active 表示だけ更新（再生成せず軽量に）
-function renderSwatchesActiveOnly(pal: Palette): void {
-  const nodes = swatches.querySelectorAll<HTMLElement>('.swatch')
+// 編集エリア側のスウォッチ（描く色の候補・クリックで選択のみ）
+function renderEditorSwatches(pal: Palette): void {
+  editorSwatches.innerHTML = ''
   pal.colors.forEach((c, i) => {
-    const node = nodes[i]
-    if (!node) return
-    node.classList.toggle('active', c.r === paint.r && c.g === paint.g && c.b === paint.b)
+    const sw = document.createElement('button')
+    sw.type = 'button'
+    sw.className = 'swatch'
+    if (c.r === paint.r && c.g === paint.g && c.b === paint.b) sw.classList.add('active')
+    sw.style.background = `rgb(${c.r},${c.g},${c.b})`
+    sw.setAttribute('role', 'listitem')
+    sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}`)
+    sw.title = `${toHex(c)}`
+    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b))
+    editorSwatches.appendChild(sw)
   })
+}
+
+// 左パネルと編集エリアの両スウォッチを更新
+function renderPalette(pal: Palette): void {
+  renderSwatches(pal)
+  renderEditorSwatches(pal)
+}
+
+// スウォッチの active 表示だけ更新（再生成せず軽量に・両コンテナ）
+function renderSwatchesActiveOnly(pal: Palette): void {
+  for (const container of [swatches, editorSwatches]) {
+    const nodes = container.querySelectorAll<HTMLElement>('.swatch')
+    pal.colors.forEach((c, i) => {
+      const node = nodes[i]
+      if (!node) return
+      node.classList.toggle('active', c.r === paint.r && c.g === paint.g && c.b === paint.b)
+    })
+  }
 }
 
 // 現在のパレットを編集可能な自作パレットへ引き上げる
@@ -187,7 +214,7 @@ function deleteColor(index: number): void {
   }
   pal.colors.splice(index, 1)
   refreshCustomLabel()
-  renderSwatches(pal)
+  renderPalette(pal)
   scheduleRender()
 }
 
@@ -196,7 +223,7 @@ addColorBtn.addEventListener('click', () => {
   const pal = ensureCustom()
   pal.colors.push(hexToPaletteColor(toHex(paint)))
   refreshCustomLabel()
-  renderSwatches(pal)
+  renderPalette(pal)
   scheduleRender()
 })
 
@@ -316,7 +343,14 @@ function render(): void {
   if (isAdaptive()) {
     palette = medianCutPalette(small, Number(adaptiveCount.value))
     lastAdaptive = palette
-    renderSwatches(palette)
+    renderPalette(palette)
+  }
+
+  // 初回は描く色をパレット先頭色にしておく（黒固定より編集しやすい）
+  if (!paintInitialized && palette.colors.length) {
+    const c0 = palette.colors[0]
+    setPaintColor(c0.r, c0.g, c0.b)
+    paintInitialized = true
   }
 
   lastResult = quantizeImage(small, { ...opts, palette })
@@ -511,7 +545,7 @@ function onControlChange(): void {
 paletteSelect.addEventListener('change', () => {
   updatePaletteUI()
   if (isAdaptive()) swatches.innerHTML = '' // 生成後に render() で埋める
-  else renderSwatches(activePalette())
+  else renderPalette(activePalette())
   scheduleRender()
 })
 
@@ -531,7 +565,7 @@ applyCustom.addEventListener('click', () => {
   opt.textContent = `自作パレット (${pal.colors.length}色)`
   paletteSelect.value = '__custom'
   customStatus.textContent = `${pal.colors.length}色を読み込みました`
-  renderSwatches(pal)
+  renderPalette(pal)
   scheduleRender()
 })
 
@@ -782,4 +816,4 @@ updateExportSizeLabel()
 setPaintColor(paint.r, paint.g, paint.b)
 updateCanvasCursor()
 updateUndoRedo()
-if (!isAdaptive()) renderSwatches(activePalette())
+if (!isAdaptive()) renderPalette(activePalette())
