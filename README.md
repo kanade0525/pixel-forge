@@ -56,7 +56,8 @@ sRGB(8bit) → 線形RGB → XYZ(sRGB/D65 行列) → **CIELAB**。
 
 ## クレジット / 商標
 
-同梱パレットの一部は各作者の配色を参考にしています。作者の皆様に感謝します。
+一部の同梱パレットは各作者のパレットをそのまま収録しています（色値自体は著作権保護の
+対象外ですが、敬意を表して出典を記載します）。
 
 - PICO-8 パレット — Lexaloffle Games
 - Sweetie 16 — GrafxKid
@@ -65,3 +66,6 @@ sRGB(8bit) → 線形RGB → XYZ(sRGB/D65 行列) → **CIELAB**。
 「Game Boy」「Game Boy Advance」「Super Nintendo」等は任天堂、「PICO-8」は
 Lexaloffle Games LLC の商標です。本ツールはこれら各社と提携・公認関係にありません。
 パレット名は識別のための記述的表示として用いています。
+
+UI スタイルに [system.css](https://github.com/sakofchit/system.css)（MIT License,
+© 2022 Sakun Acharige）を使用しています。詳細は [THIRD-PARTY-LICENSES.md](./THIRD-PARTY-LICENSES.md) を参照。

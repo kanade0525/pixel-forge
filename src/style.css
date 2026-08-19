@@ -42,18 +42,43 @@ body {
   gap: 24px;
   align-items: start;
 }
+/* 視覚的に隠すが click() でネイティブピッカーを確実に開けるようにする（display:none だと不確実） */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* デスクトップ: 設定を操作する間もプレビューを追従表示（右カラムの空白解消） */
+@media (min-width: 821px) {
+  .preview {
+    position: sticky;
+    top: 12px;
+  }
+}
+
 @media (max-width: 820px) {
   .app-grid {
     grid-template-columns: 1fr;
   }
-  /* モバイルでは結果を先頭に出す（調整結果が即見える） */
-  .preview {
+  /* 画像読込後のみプレビューを先頭に（未読込時は操作を上に出す） */
+  body.has-image .preview {
     order: -1;
   }
   /* 詳細タグラインはモバイルで折返して重なるため隠す */
   .details-bar .tagline-detail {
     display: none;
   }
+  .canvas-wrap {
+    min-height: 120px;
+  }
+}
+
+/* ディザ手法ラベルの間隔（字詰まり防止） */
+.dither-row label {
+  margin-right: 12px;
 }
 
 #paletteSelect {

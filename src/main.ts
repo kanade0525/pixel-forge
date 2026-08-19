@@ -46,7 +46,11 @@ const infoColors = $('infoColors')
 const infoExport = $('infoExport')
 const infoTime = $('infoTime')
 
-const MAX_INPUT_DIM = 8192 // これを超える巨大画像は getImageData 失敗の恐れがあり拒否
+// iOS Safari 等の canvas 面積上限（概ね 4096²=16.7Mpx）を避けるため、長辺をこの値以下へ縮小して取り込む。
+// ドット絵化は最終的に 16〜256px へ縮小するため、2048 で十分な品質。
+const SAFE_DIM = 2048
+const HARD_MAX_MP = 100 // これを超える巨大画像は取り込み拒否（デコード直後に判定）
+const HARD_MAX_AREA = HARD_MAX_MP * 1_000_000
 
 // --- 状態 ---
 let sourceImage: PixelImage | null = null
@@ -134,8 +138,12 @@ swatchColor.addEventListener('input', () => {
 
 function deleteColor(index: number): void {
   const pal = ensureCustom()
-  if (pal.colors.length <= 1) return // 最低1色は残す
+  if (pal.colors.length <= 1) {
+    showToast('最低1色は必要です')
+    return
+  }
   pal.colors.splice(index, 1)
+  editingIndex = -1
   refreshCustomLabel()
   renderSwatches(pal)
   scheduleRender()
@@ -177,15 +185,30 @@ function clampInt(v: string, min: number, max: number, fallback: number): number
 // --- 画像読み込み ---
 async function loadFile(file: File): Promise<void> {
   if (!file.type.startsWith('image/')) {
-    showHint('画像ファイルを選んでください。')
+    showToast('画像ファイルを選んでください。')
     return
   }
   try {
-    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    if (bmp.width > MAX_INPUT_DIM || bmp.height > MAX_INPUT_DIM) {
+    let bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const origW = bmp.width
+    const origH = bmp.height
+    if (origW * origH > HARD_MAX_AREA) {
       bmp.close()
-      showHint(`画像が大きすぎます（最大 ${MAX_INPUT_DIM}px）。`)
+      showToast(`画像が大きすぎます（最大 ${HARD_MAX_MP}メガピクセル）。`)
       return
+    }
+    // 長辺が SAFE_DIM を超える場合は取り込み時に縮小（iOS の canvas 面積上限による無音破綻を防ぐ）
+    if (origW > SAFE_DIM || origH > SAFE_DIM) {
+      const scale = SAFE_DIM / Math.max(origW, origH)
+      const rw = Math.max(1, Math.round(origW * scale))
+      const rh = Math.max(1, Math.round(origH * scale))
+      const resized = await createImageBitmap(bmp, {
+        resizeWidth: rw,
+        resizeHeight: rh,
+        resizeQuality: 'high',
+      })
+      bmp.close()
+      bmp = resized
     }
     const cv = document.createElement('canvas')
     cv.width = bmp.width
@@ -194,22 +217,20 @@ async function loadFile(file: File): Promise<void> {
     if (!ctx) throw new Error('canvas 2d コンテキストを取得できません')
     ctx.drawImage(bmp, 0, 0)
     const id = ctx.getImageData(0, 0, bmp.width, bmp.height)
+    const w = bmp.width
+    const h = bmp.height
     bmp.close()
     sourceImage = { width: id.width, height: id.height, data: id.data }
-    infoSrc.textContent = `${id.width}×${id.height}px`
+    infoSrc.textContent =
+      w !== origW || h !== origH ? `${origW}×${origH}px → ${w}×${h}px` : `${w}×${h}px`
     emptyState.hidden = true
+    document.body.classList.add('has-image')
     drawSource()
-    exportBtn.disabled = false
-    scheduleRender()
+    scheduleRender() // 初回レンダ完了時に保存ボタンを有効化する
   } catch (err) {
     console.error(err)
-    showHint('画像を読み込めませんでした（対応形式・破損をご確認ください）。')
+    showToast('画像を読み込めませんでした（対応形式・破損をご確認ください）。')
   }
-}
-
-function showHint(msg: string): void {
-  // 情報カード横のトーストで簡易通知
-  showToast(msg)
 }
 
 function drawSource(): void {
@@ -255,6 +276,7 @@ function render(): void {
   infoColors.textContent = `${opts.palette.colors.length}色`
   infoTime.textContent = `${ms.toFixed(1)}ms`
   updateExportSizeLabel()
+  exportBtn.disabled = false // 初回レンダ完了＝lastResult 確定後に有効化
 }
 
 function updateExportSizeLabel(): void {
@@ -263,7 +285,7 @@ function updateExportSizeLabel(): void {
   const scale = Number(exportScaleSel.value)
   const label = `${w * scale}×${h * scale}px`
   exportSizeLabel.textContent = label
-  infoExport.textContent = label
+  infoExport.textContent = sourceImage ? label : '—'
 }
 
 function previewZoom(img: PixelImage): number {
@@ -294,8 +316,22 @@ function toImageData(img: PixelImage): ImageData {
 
 // --- 書き出し ---
 function exportPng(): void {
+  // 保留中の描画があれば先に確定させ、ラベル表示とダウンロード内容の食い違いを防ぐ
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = 0
+    try {
+      render()
+    } catch (err) {
+      console.error(err)
+    }
+    outCanvas.setAttribute('aria-busy', 'false')
+  }
   const result = lastResult
-  if (!result) return
+  if (!result) {
+    showToast('先に画像を読み込んでください')
+    return
+  }
   const scale = Number(exportScaleSel.value)
   const small = imageToCanvas(result)
   const out = document.createElement('canvas')
@@ -308,11 +344,13 @@ function exportPng(): void {
   const name = `pixelforge_${result.width}x${result.height}_x${scale}.png`
   out.toBlob((blob) => {
     if (!blob) return
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
+    a.href = url
     a.download = name
     a.click()
-    URL.revokeObjectURL(a.href)
+    // ダウンロード開始前に revoke するとブラウザによっては失敗するため次tickへ遅延
+    setTimeout(() => URL.revokeObjectURL(url), 0)
     showToast(`${name} を保存しました`)
   }, 'image/png')
 }
@@ -371,7 +409,6 @@ document.querySelectorAll<HTMLElement>('.presets .btn').forEach((chip) =>
 function onControlChange(): void {
   strengthVal.textContent = Number(strength.value).toFixed(2)
   updateVisibility()
-  renderSwatches(activePalette())
   updateExportSizeLabel()
   scheduleRender()
 }
@@ -396,6 +433,7 @@ applyCustom.addEventListener('click', () => {
   }
   opt.textContent = `自作パレット (${pal.colors.length}色)`
   paletteSelect.value = '__custom'
+  editingIndex = -1
   customStatus.textContent = `${pal.colors.length}色を読み込みました`
   renderSwatches(pal)
   scheduleRender()
