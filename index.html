@@ -46,9 +46,9 @@
             <h3 class="sec-title">2. 出力サイズ</h3>
             <div class="field-row">
               <label for="outW">幅</label>
-              <input id="outW" type="number" min="1" max="256" value="16" />
+              <input id="outW" type="number" min="1" max="2048" value="16" />
               <label for="outH">高さ</label>
-              <input id="outH" type="number" min="1" max="256" value="16" />
+              <input id="outH" type="number" min="1" max="2048" value="16" />
             </div>
             <div class="field-row presets">
               <button class="btn" data-w="16" data-h="16">16×16</button>
@@ -57,6 +57,7 @@
               <button class="btn" data-w="64" data-h="64">64×64</button>
               <button class="btn" data-w="128" data-h="128">128×128</button>
               <button class="btn" data-w="256" data-h="256">256×256</button>
+              <button class="btn" id="origSize" title="読み込んだ画像の解像度そのまま">元のサイズ</button>
             </div>
 
             <hr class="separator" />

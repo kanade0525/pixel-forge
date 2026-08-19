@@ -207,8 +207,8 @@ function currentDither(): DitherMode {
 
 function readOptions(): ConvertOptions {
   return {
-    targetW: clampInt(outW.value, 1, 256, 16),
-    targetH: clampInt(outH.value, 1, 256, 16),
+    targetW: clampInt(outW.value, 1, 2048, 16),
+    targetH: clampInt(outH.value, 1, 2048, 16),
     downscale: downscaleSel.value as DownscaleMode,
     palette: activePalette(),
     dither: currentDither(),
@@ -337,8 +337,8 @@ function render(): void {
 }
 
 function updateExportSizeLabel(): void {
-  const w = clampInt(outW.value, 1, 256, 16)
-  const h = clampInt(outH.value, 1, 256, 16)
+  const w = clampInt(outW.value, 1, 2048, 16)
+  const h = clampInt(outH.value, 1, 2048, 16)
   const scale = Number(exportScaleSel.value)
   const label = `${w * scale}×${h * scale}px`
   exportSizeLabel.textContent = label
@@ -482,13 +482,24 @@ exportScaleSel.addEventListener('input', updateExportSizeLabel)
 document
   .querySelectorAll('input[name="dither"]')
   .forEach((el) => el.addEventListener('change', onControlChange))
-document.querySelectorAll<HTMLElement>('.presets .btn').forEach((chip) =>
+document.querySelectorAll<HTMLElement>('.presets .btn[data-w]').forEach((chip) =>
   chip.addEventListener('click', () => {
     outW.value = chip.dataset.w ?? '16'
     outH.value = chip.dataset.h ?? '16'
     onControlChange()
   })
 )
+
+// 「元のサイズ」: 読み込んだ画像の解像度そのままで変換・編集（縮小しない）
+$<HTMLButtonElement>('origSize').addEventListener('click', () => {
+  if (!sourceImage) {
+    showToast('先に画像を読み込んでください')
+    return
+  }
+  outW.value = String(sourceImage.width)
+  outH.value = String(sourceImage.height)
+  onControlChange()
+})
 
 function onControlChange(): void {
   strengthVal.textContent = Number(strength.value).toFixed(2)
