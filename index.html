@@ -2,130 +2,186 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#000000" />
+    <meta
+      name="description"
+      content="画像を16×16px等のドット絵に変換するツール。Lab色空間の最近色マッチングとベイヤー/フロイド–スタインバーグのディザリングでバンディングを抑えます。"
+    />
+    <meta property="og:title" content="Pixel Forge — 画像→ピクセルアート変換" />
+    <meta
+      property="og:description"
+      content="Lab色空間 ＋ ベイヤー / フロイド–スタインバーグで画像をドット絵化。ブラウザ内で完結。"
+    />
+    <meta property="og:type" content="website" />
     <title>Pixel Forge — 画像→ピクセルアート変換</title>
   </head>
   <body>
-    <header class="app-header">
-      <h1>Pixel Forge</h1>
-      <p class="tagline">画像 → ドット絵（Lab最近色 ＋ ベイヤー / フロイド–スタインバーグ）</p>
-    </header>
+    <div class="window app-window">
+      <div class="title-bar">
+        <button aria-hidden="true" class="hidden"></button>
+        <h1 class="title">Pixel Forge</h1>
+        <button aria-hidden="true" class="hidden"></button>
+      </div>
+      <div class="details-bar">
+        <span>画像 → ドット絵</span>
+        <span class="tagline-detail">Lab最近色 ＋ ベイヤー / フロイド–スタインバーグ</span>
+      </div>
 
-    <main class="layout">
-      <!-- 左: 入力と設定 -->
-      <section class="panel controls">
-        <div id="dropzone" class="dropzone">
-          <p>画像をここにドラッグ＆ドロップ</p>
-          <p class="sub">または</p>
-          <label class="btn">
-            ファイルを選択
-            <input id="fileInput" type="file" accept="image/*" hidden />
-          </label>
-        </div>
+      <div class="window-pane app-pane">
+        <div class="app-grid">
+          <!-- 左: 設定 -->
+          <section class="controls">
+            <h3 class="sec-title">1. 画像を読み込む</h3>
+            <div id="dropzone" class="dropzone">
+              <p>画像をドラッグ＆ドロップ</p>
+              <label class="btn">
+                ファイルを選択
+                <input id="fileInput" type="file" accept="image/*" hidden />
+              </label>
+            </div>
 
-        <fieldset>
-          <legend>出力サイズ</legend>
-          <div class="row">
-            <label>幅 <input id="outW" type="number" min="1" max="256" value="16" /></label>
-            <label>高さ <input id="outH" type="number" min="1" max="256" value="16" /></label>
-          </div>
-          <div class="row presets">
-            <button class="chip" data-w="16" data-h="16">16×16 タイル</button>
-            <button class="chip" data-w="16" data-h="28">16×28 キャラ</button>
-            <button class="chip" data-w="32" data-h="32">32×32</button>
-            <button class="chip" data-w="32" data-h="36">32×36 ボス</button>
-          </div>
-        </fieldset>
+            <hr class="separator" />
+            <h3 class="sec-title">2. 出力サイズ</h3>
+            <div class="field-row">
+              <label for="outW">幅</label>
+              <input id="outW" type="number" min="1" max="256" value="16" />
+              <label for="outH">高さ</label>
+              <input id="outH" type="number" min="1" max="256" value="16" />
+            </div>
+            <div class="field-row presets">
+              <button class="btn" data-w="16" data-h="16">16×16 タイル</button>
+              <button class="btn" data-w="16" data-h="28">16×28 キャラ</button>
+              <button class="btn" data-w="32" data-h="32">32×32</button>
+              <button class="btn" data-w="32" data-h="36">32×36 ボス</button>
+            </div>
 
-        <fieldset>
-          <legend>パレット</legend>
-          <select id="paletteSelect"></select>
-          <div id="swatches" class="swatches"></div>
-          <details>
-            <summary>自作パレットを読み込む（HEX / .gpl）</summary>
-            <textarea
-              id="customPalette"
-              rows="4"
-              placeholder="#1a1c2c&#10;#5d275d&#10;… または .gpl の中身を貼付"
-            ></textarea>
-            <button id="applyCustom" class="btn small">適用</button>
-            <span id="customStatus" class="status"></span>
-          </details>
-        </fieldset>
+            <hr class="separator" />
+            <h3 class="sec-title">3. パレット</h3>
+            <div class="field-row">
+              <select id="paletteSelect" aria-label="パレットを選択"></select>
+            </div>
+            <div id="swatches" class="swatches" role="list" aria-label="パレットの色"></div>
+            <div class="field-row">
+              <button id="addColor" class="btn" type="button">＋ 色を追加</button>
+              <span class="hint-inline">クリックで編集 / 右クリックで削除</span>
+            </div>
+            <input id="swatchColor" type="color" hidden />
+            <details>
+              <summary>自作パレットを読み込む（HEX / .gpl）</summary>
+              <textarea
+                id="customPalette"
+                rows="4"
+                placeholder="#1a1c2c #5d275d … または .gpl の中身を貼付"
+              ></textarea>
+              <div class="field-row">
+                <button id="applyCustom" class="btn" type="button">適用</button>
+                <span id="customStatus" class="hint-inline"></span>
+              </div>
+            </details>
 
-        <fieldset>
-          <legend>ディザリング手法</legend>
-          <label><input type="radio" name="dither" value="none" /> なし（最近色のみ）</label>
-          <label><input type="radio" name="dither" value="ordered" checked /> 組織的（ベイヤー）</label>
-          <label><input type="radio" name="dither" value="fs" /> フロイド–スタインバーグ</label>
-
-          <div class="row" id="bayerRow">
-            <label>ベイヤー
+            <hr class="separator" />
+            <h3 class="sec-title">4. ディザリング手法</h3>
+            <div class="field-row dither-row">
+              <input type="radio" id="dither-none" name="dither" value="none" />
+              <label for="dither-none">なし</label>
+              <input type="radio" id="dither-ordered" name="dither" value="ordered" checked />
+              <label for="dither-ordered">ベイヤー</label>
+              <input type="radio" id="dither-fs" name="dither" value="fs" />
+              <label for="dither-fs">フロイド–S</label>
+            </div>
+            <p id="ditherHelp" class="help"></p>
+            <div class="field-row" id="bayerRow">
+              <label for="bayerSize">ベイヤー行列</label>
               <select id="bayerSize">
                 <option value="2">2×2</option>
                 <option value="4" selected>4×4</option>
                 <option value="8">8×8</option>
               </select>
-            </label>
-          </div>
-          <div class="row" id="serpentineRow" hidden>
-            <label><input id="serpentine" type="checkbox" checked /> serpentine走査</label>
-          </div>
-          <div class="row">
-            <label>強度 <input id="strength" type="range" min="0" max="1" step="0.05" value="1" /></label>
-            <span id="strengthVal" class="status">1.00</span>
-          </div>
-        </fieldset>
+            </div>
+            <div class="field-row" id="serpentineRow" hidden>
+              <input id="serpentine" type="checkbox" checked />
+              <label for="serpentine">蛇行走査（縞を軽減）</label>
+            </div>
+            <div class="field-row">
+              <label for="strength">強度</label>
+              <input id="strength" type="range" min="0" max="1" step="0.05" value="1" />
+              <span id="strengthVal" class="num">1.00</span>
+            </div>
 
-        <fieldset>
-          <legend>詳細</legend>
-          <div class="row">
-            <label>縮小
+            <hr class="separator" />
+            <h3 class="sec-title">5. 詳細</h3>
+            <div class="field-row">
+              <label for="downscale">縮小</label>
               <select id="downscale">
-                <option value="area" selected>面積平均（高品質）</option>
+                <option value="area" selected>面積平均</option>
                 <option value="nearest">ニアレスト</option>
               </select>
-            </label>
-            <label>色差
+            </div>
+            <div class="field-row">
+              <label for="deltaMode">色差</label>
               <select id="deltaMode">
                 <option value="76" selected>ΔE76（高速）</option>
                 <option value="2000">CIEDE2000（高精度）</option>
               </select>
-            </label>
-          </div>
-        </fieldset>
+            </div>
 
-        <fieldset>
-          <legend>書き出し</legend>
-          <div class="row">
-            <label>拡大
+            <hr class="separator" />
+            <h3 class="sec-title">6. 書き出し</h3>
+            <div class="field-row">
+              <label for="exportScale">拡大</label>
               <select id="exportScale">
                 <option value="1">×1（原寸）</option>
                 <option value="4">×4</option>
                 <option value="8" selected>×8</option>
                 <option value="16">×16</option>
               </select>
-            </label>
-            <button id="exportBtn" class="btn" disabled>PNGを保存</button>
-          </div>
-        </fieldset>
-      </section>
+              <span id="exportSizeLabel" class="num">—</span>
+            </div>
+            <div class="field-row">
+              <button id="exportBtn" class="btn btn-default" type="button" disabled>PNGを保存</button>
+            </div>
+          </section>
 
-      <!-- 右: プレビュー -->
-      <section class="panel preview">
-        <div class="preview-grid">
-          <figure>
-            <figcaption>入力</figcaption>
-            <div class="canvas-wrap"><canvas id="srcCanvas"></canvas></div>
-          </figure>
-          <figure>
-            <figcaption>出力（<span id="outLabel">16×16</span>・拡大表示）</figcaption>
-            <div class="canvas-wrap checker"><canvas id="outCanvas"></canvas></div>
-          </figure>
+          <!-- 右: プレビュー -->
+          <section class="preview">
+            <div class="preview-grid">
+              <figure>
+                <figcaption>入力</figcaption>
+                <div class="canvas-wrap checker">
+                  <canvas id="srcCanvas" role="img" aria-label="入力画像"></canvas>
+                </div>
+              </figure>
+              <figure>
+                <figcaption>出力（<span id="outLabel">16×16</span>・拡大表示）</figcaption>
+                <div class="canvas-wrap checker">
+                  <canvas id="outCanvas" role="img" aria-label="変換後のドット絵"></canvas>
+                  <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>
+                </div>
+              </figure>
+            </div>
+
+            <hr class="separator" />
+            <dl class="info" id="infoCard">
+              <div><dt>入力サイズ</dt><dd id="infoSrc">—</dd></div>
+              <div><dt>出力サイズ</dt><dd id="infoOut">—</dd></div>
+              <div><dt>パレット色数</dt><dd id="infoColors">—</dd></div>
+              <div><dt>書き出し寸法</dt><dd id="infoExport">—</dd></div>
+              <div><dt>処理時間</dt><dd id="infoTime">—</dd></div>
+            </dl>
+          </section>
         </div>
-        <p id="hint" class="hint">画像を読み込むとプレビューが表示されます。</p>
-      </section>
-    </main>
+
+        <hr class="separator" />
+        <footer class="app-footer">
+          画像はブラウザ内で処理され、サーバーには送信されません。入力画像の権利は利用者に帰属し、
+          出力物の権利は入力画像のライセンスに従います。
+        </footer>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

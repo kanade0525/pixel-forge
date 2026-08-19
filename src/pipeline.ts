@@ -7,6 +7,9 @@ import { quantizeOrdered } from './quantize/ordered'
 import { quantizeFloydSteinberg } from './quantize/floyd-steinberg'
 
 export function convert(src: PixelImage, opts: ConvertOptions): PixelImage {
+  if (opts.palette.colors.length === 0) {
+    throw new Error('パレットに色がありません')
+  }
   const small = downscale(src, opts.targetW, opts.targetH, opts.downscale)
 
   switch (opts.dither) {

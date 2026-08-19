@@ -1,13 +1,14 @@
 // 自作パレットの読込。対応形式:
 //  - HEX リスト（1行1色 or 空白/カンマ区切り。"#" 有無どちらも可）
 //  - GIMP パレット (.gpl): "R G B name" 行を読む
-import type { Palette } from '../types'
-import { hexToPaletteColor, makePalette } from './palettes'
+import type { Palette, PaletteColor } from '../types'
+import { hexToPaletteColor } from './palettes'
 import { rgbToLab, srgbToLinear } from '../color/space'
 
-const HEX_RE = /#?[0-9a-fA-F]{6}/g
+// # 付きは 3〜8 桁、# 無しは 6 桁のみ（本文中の数字の誤検出を避ける）
+const HEX_RE = /#[0-9a-fA-F]{3,8}\b|\b[0-9a-fA-F]{6}\b/g
 
-/** テキストからパレットを推定して読む（.gpl or hex リスト）。空なら null。 */
+/** テキストからパレットを推定して読む（.gpl or hex リスト）。空/色なしなら null。 */
 export function parsePaletteText(text: string, name = 'カスタム'): Palette | null {
   const trimmed = text.trim()
   if (!trimmed) return null
@@ -17,9 +18,23 @@ export function parsePaletteText(text: string, name = 'カスタム'): Palette |
     if (pal && pal.colors.length > 0) return pal
   }
 
-  const hexes = trimmed.match(HEX_RE)
-  if (hexes && hexes.length > 0) {
-    return makePalette(`custom-${Date.now()}`, name, dedupe(hexes.map((h) => h.replace('#', '').toLowerCase())))
+  const matches = trimmed.match(HEX_RE)
+  if (matches) {
+    const colors: PaletteColor[] = []
+    const seen = new Set<string>()
+    for (const m of matches) {
+      let color: PaletteColor
+      try {
+        color = hexToPaletteColor(m)
+      } catch {
+        continue // 不正なHEXはスキップ
+      }
+      const key = `${color.r},${color.g},${color.b}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      colors.push(color)
+    }
+    if (colors.length > 0) return { id: `custom-${Date.now()}`, name, colors }
   }
   return null
 }
@@ -51,10 +66,6 @@ function parseGpl(text: string, name: string): Palette | null {
 
 function clamp255(v: number): number {
   return v < 0 ? 0 : v > 255 ? 255 : v
-}
-
-function dedupe(hexes: string[]): string[] {
-  return Array.from(new Set(hexes))
 }
 
 // 単一 hex → PaletteColor を再輸出（UI から使う用途）

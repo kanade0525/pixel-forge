@@ -5,14 +5,21 @@ import type { PixelImage, DownscaleMode } from '../types'
 import { srgbToLinear, linearToSrgb } from '../color/space'
 import { createImage } from '../types'
 
+// 目標サイズの健全化: NaN/Infinity は 1 に、範囲は 1..4096 にクランプ。
+const MAX_DIM = 4096
+function clampSize(v: number): number {
+  if (!Number.isFinite(v)) return 1
+  return Math.max(1, Math.min(MAX_DIM, Math.floor(v)))
+}
+
 export function downscale(
   src: PixelImage,
   targetW: number,
   targetH: number,
   mode: DownscaleMode
 ): PixelImage {
-  const w = Math.max(1, Math.floor(targetW))
-  const h = Math.max(1, Math.floor(targetH))
+  const w = clampSize(targetW)
+  const h = clampSize(targetH)
   return mode === 'nearest' ? nearest(src, w, h) : areaAverage(src, w, h)
 }
 

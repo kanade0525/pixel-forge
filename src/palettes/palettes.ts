@@ -3,9 +3,18 @@
 import type { Palette, PaletteColor } from '../types'
 import { rgbToLab, srgbToLinear } from '../color/space'
 
-/** "#rrggbb" or "rrggbb" → PaletteColor（lab/線形を事前計算） */
+/**
+ * "#rgb" / "#rrggbb" / "#rrggbbaa"（アルファ無視）→ PaletteColor（lab/線形を事前計算）。
+ * 不正な HEX は例外を投げる（呼び出し側でフィルタ）。
+ */
 export function hexToPaletteColor(hex: string): PaletteColor {
-  const h = hex.replace('#', '').trim()
+  let h = hex.replace('#', '').trim().toLowerCase()
+  if (/^[0-9a-f]{3}$/.test(h)) {
+    h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2] // 3桁短縮を展開
+  }
+  if (!/^[0-9a-f]{6}([0-9a-f]{2})?$/.test(h)) {
+    throw new Error(`不正なHEX: ${hex}`)
+  }
   const r = parseInt(h.slice(0, 2), 16)
   const g = parseInt(h.slice(2, 4), 16)
   const b = parseInt(h.slice(4, 6), 16)

@@ -18,13 +18,14 @@ export function quantizeFloydSteinberg(
   const d = img.data
   const s = clamp01(strength)
 
-  // 線形RGB float 作業バッファ
-  const buf = new Float64Array(w * h * 3)
+  // 線形RGB float 作業バッファ（Float32で十分・メモリ半減）
+  const buf = new Float32Array(w * h * 3)
   for (let p = 0, q = 0; p < d.length; p += 4, q += 3) {
     buf[q] = srgbToLinear(d[p])
     buf[q + 1] = srgbToLinear(d[p + 1])
     buf[q + 2] = srgbToLinear(d[p + 2])
   }
+  const ALPHA_THRESHOLD = 8 // これ未満の透明画素は誤差を拡散しない（不透明側への滲み防止）
 
   for (let y = 0; y < h; y++) {
     const ltr = !serpentine || y % 2 === 0 // 左→右 か
@@ -44,6 +45,10 @@ export function quantizeFloydSteinberg(
       d[pi] = c.r
       d[pi + 1] = c.g
       d[pi + 2] = c.b
+      // アルファは保持（透明画素の色は保持しつつ、誤差だけ拡散しない）
+
+      // 透明画素の誤差を不透明側へ拡散すると縁に色が滲むため、透明画素は拡散しない
+      if (d[pi + 3] < ALPHA_THRESHOLD) continue
 
       // 誤差（線形）× strength を近傍へ拡散
       const er = (rl - c.lr) * s
@@ -61,7 +66,7 @@ export function quantizeFloydSteinberg(
 }
 
 function diffuse(
-  buf: Float64Array,
+  buf: Float32Array,
   w: number,
   h: number,
   x: number,
