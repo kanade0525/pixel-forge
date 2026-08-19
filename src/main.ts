@@ -28,6 +28,8 @@ const paintColorInput = $<HTMLInputElement>('paintColor')
 const editorToolbar = $('editorToolbar')
 const undoBtn = $<HTMLButtonElement>('undoBtn')
 const redoBtn = $<HTMLButtonElement>('redoBtn')
+const flipHBtn = $<HTMLButtonElement>('flipH')
+const flipVBtn = $<HTMLButtonElement>('flipV')
 const gridToggle = $<HTMLInputElement>('gridToggle')
 const applyCustom = $<HTMLButtonElement>('applyCustom')
 const customStatus = $('customStatus')
@@ -328,7 +330,10 @@ function render(): void {
   infoColors.textContent = `${palette.colors.length}色`
   infoTime.textContent = `${ms.toFixed(1)}ms`
   updateExportSizeLabel()
-  exportBtn.disabled = false // 初回レンダ完了＝lastResult 確定後に有効化
+  // 初回レンダ完了＝lastResult 確定後に編集系を有効化
+  exportBtn.disabled = false
+  flipHBtn.disabled = false
+  flipVBtn.disabled = false
 }
 
 function updateExportSizeLabel(): void {
@@ -706,6 +711,48 @@ gridToggle.addEventListener('change', () => {
 })
 undoBtn.addEventListener('click', undo)
 redoBtn.addEventListener('click', redo)
+
+// --- 反転（左右／上下） ---
+function flipHorizontal(): void {
+  if (!lastResult) return
+  const { width: w, height: h, data: d } = lastResult
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w >> 1; x++) {
+      const a = (y * w + x) * 4
+      const b = (y * w + (w - 1 - x)) * 4
+      for (let k = 0; k < 4; k++) {
+        const t = d[a + k]
+        d[a + k] = d[b + k]
+        d[b + k] = t
+      }
+    }
+  }
+}
+function flipVertical(): void {
+  if (!lastResult) return
+  const { width: w, height: h, data: d } = lastResult
+  const row = w * 4
+  const tmp = new Uint8ClampedArray(row)
+  for (let y = 0; y < h >> 1; y++) {
+    const top = y * row
+    const bot = (h - 1 - y) * row
+    tmp.set(d.subarray(top, top + row))
+    d.copyWithin(top, bot, bot + row)
+    d.set(tmp, bot)
+  }
+}
+flipHBtn.addEventListener('click', () => {
+  if (!lastResult) return
+  pushUndo()
+  flipHorizontal()
+  drawOutput()
+})
+flipVBtn.addEventListener('click', () => {
+  if (!lastResult) return
+  pushUndo()
+  flipVertical()
+  drawOutput()
+})
 window.addEventListener('keydown', (e) => {
   if (!(e.ctrlKey || e.metaKey)) return
   if (e.key === 'z' && !e.shiftKey) {
