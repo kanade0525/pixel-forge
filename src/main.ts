@@ -3,7 +3,9 @@ import './style.css'
 import type { ConvertOptions, DitherMode, DownscaleMode, BayerSize, Palette, PixelImage } from './types'
 import { PALETTES, getPalette, hexToPaletteColor } from './palettes/palettes'
 import { parsePaletteText } from './palettes/parse'
-import { convert } from './pipeline'
+import { medianCutPalette } from './palettes/adaptive'
+import { downscale } from './downscale/downscale'
+import { quantizeImage } from './pipeline'
 
 // --- DOM 参照 ---
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
@@ -17,6 +19,8 @@ const fileInput = $<HTMLInputElement>('fileInput')
 const outW = $<HTMLInputElement>('outW')
 const outH = $<HTMLInputElement>('outH')
 const paletteSelect = $<HTMLSelectElement>('paletteSelect')
+const adaptiveRow = $('adaptiveRow')
+const adaptiveCount = $<HTMLSelectElement>('adaptiveCount')
 const swatches = $('swatches')
 const addColorBtn = $<HTMLButtonElement>('addColor')
 const swatchColor = $<HTMLInputElement>('swatchColor')
@@ -55,6 +59,7 @@ const HARD_MAX_AREA = HARD_MAX_MP * 1_000_000
 // --- 状態 ---
 let sourceImage: PixelImage | null = null
 let customPal: Palette | null = null
+let lastAdaptive: Palette | null = null
 let lastResult: PixelImage | null = null
 let editingIndex = -1
 
@@ -64,17 +69,33 @@ const DITHER_HELP: Record<DitherMode, string> = {
   fs: '誤差拡散で自然に混色。階調とディテールに強い。',
 }
 
-// --- パレット選択肢を構築 ---
+// --- パレット選択肢を構築（先頭に「画像から自動生成」） ---
+const adaptiveOpt = document.createElement('option')
+adaptiveOpt.value = '__adaptive'
+adaptiveOpt.textContent = '画像から自動生成'
+paletteSelect.appendChild(adaptiveOpt)
 for (const p of PALETTES) {
   const opt = document.createElement('option')
   opt.value = p.id
   opt.textContent = p.name
   paletteSelect.appendChild(opt)
 }
+paletteSelect.value = '__adaptive' // 既定はどんな画像にも合う自動生成
+
+const FALLBACK_PALETTE = getPalette('endesga32') ?? PALETTES[0]
 
 function activePalette(): Palette {
   if (paletteSelect.value === '__custom' && customPal) return customPal
+  if (paletteSelect.value === '__adaptive') return lastAdaptive ?? FALLBACK_PALETTE
   return getPalette(paletteSelect.value) ?? PALETTES[0]
+}
+
+function isAdaptive(): boolean {
+  return paletteSelect.value === '__adaptive'
+}
+
+function updatePaletteUI(): void {
+  adaptiveRow.hidden = !isAdaptive()
 }
 
 const hex = (n: number) => n.toString(16).padStart(2, '0')
@@ -266,14 +287,24 @@ function render(): void {
   if (!sourceImage) return
   const opts = readOptions()
   const t0 = performance.now()
-  lastResult = convert(sourceImage, opts)
+  const small = downscale(sourceImage, opts.targetW, opts.targetH, opts.downscale)
+
+  // 自動生成パレットは縮小後の画像から作る（画像内の代表色にフィット）
+  let palette = opts.palette
+  if (isAdaptive()) {
+    palette = medianCutPalette(small, Number(adaptiveCount.value))
+    lastAdaptive = palette
+    renderSwatches(palette)
+  }
+
+  lastResult = quantizeImage(small, { ...opts, palette })
   const ms = performance.now() - t0
 
   outLabel.textContent = `${opts.targetW}×${opts.targetH}`
   drawScaled(outCanvas, lastResult, previewZoom(lastResult))
 
   infoOut.textContent = `${opts.targetW}×${opts.targetH}px`
-  infoColors.textContent = `${opts.palette.colors.length}色`
+  infoColors.textContent = `${palette.colors.length}色`
   infoTime.textContent = `${ms.toFixed(1)}ms`
   updateExportSizeLabel()
   exportBtn.disabled = false // 初回レンダ完了＝lastResult 確定後に有効化
@@ -392,7 +423,7 @@ fileInput.addEventListener('change', () => {
   if (fileInput.files?.[0]) void loadFile(fileInput.files[0])
 })
 
-const rerenderEls = [outW, outH, bayerSize, strength, downscaleSel, deltaModeSel, serpentine]
+const rerenderEls = [outW, outH, bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
 rerenderEls.forEach((el) => el.addEventListener('input', onControlChange))
 exportScaleSel.addEventListener('input', updateExportSizeLabel)
 document
@@ -414,7 +445,9 @@ function onControlChange(): void {
 }
 
 paletteSelect.addEventListener('change', () => {
-  renderSwatches(activePalette())
+  updatePaletteUI()
+  if (isAdaptive()) swatches.innerHTML = '' // 生成後に render() で埋める
+  else renderSwatches(activePalette())
   scheduleRender()
 })
 
@@ -442,6 +475,7 @@ applyCustom.addEventListener('click', () => {
 exportBtn.addEventListener('click', exportPng)
 
 // --- 初期表示 ---
-renderSwatches(activePalette())
+updatePaletteUI()
 updateVisibility()
 updateExportSizeLabel()
+if (!isAdaptive()) renderSwatches(activePalette())
