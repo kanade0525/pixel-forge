@@ -41,7 +41,7 @@ const frameLabel = $('frameLabel')
 const frameDup = $<HTMLButtonElement>('frameDup')
 const frameBlank = $<HTMLButtonElement>('frameBlank')
 const frameDel = $<HTMLButtonElement>('frameDel')
-const onionToggle = $<HTMLInputElement>('onionToggle')
+const refMode = $<HTMLSelectElement>('refMode') // 透かし（下絵）: none/source/prev
 const onionOpacity = $<HTMLInputElement>('onionOpacity')
 const sheetExportBtn = $<HTMLButtonElement>('sheetExport')
 const openModalBtn = $<HTMLButtonElement>('openModal')
@@ -105,9 +105,9 @@ const redoStack: Uint8ClampedArray[] = []
 const MAX_HISTORY = 40
 
 const DITHER_HELP: Record<DitherMode, string> = {
-  none: '最近色へ置換（ディザなし）。色段差（バンディング）が出やすい。',
-  ordered: 'ベイヤー行列で規則的に混色。均一・高速でタイル向き。',
-  fs: '誤差拡散で自然に混色。階調とディテールに強い。',
+  none: 'いちばん近い色に置き換えます。輪郭くっきりで、小さいドット絵はこれが基本。',
+  ordered: '規則的な網目模様を重ねて中間色を表現します。均一でレトロな質感。',
+  fs: 'ドットを細かく散らして自然に色を混ぜます。写真やグラデーション向き。',
 }
 
 // --- パレット選択肢を構築（先頭に「画像から自動生成」） ---
@@ -148,12 +148,11 @@ function renderSwatches(pal: Palette): void {
     const sw = document.createElement('button')
     sw.type = 'button'
     sw.className = 'swatch'
-    if (i === selectedSwatch) sw.classList.add('active')
+    // 左（変換用）パレットは描く色の選択リングを出さない（編集側と連動させない）
     sw.style.background = `rgb(${c.r},${c.g},${c.b})`
     sw.setAttribute('role', 'listitem')
-    sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}（クリックで描く色に）`)
-    sw.title = `${toHex(c)}（クリックで描く色に / 右クリックで削除）`
-    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b, i))
+    sw.setAttribute('aria-label', `変換色 ${i + 1}: ${toHex(c)}（右クリックで削除）`)
+    sw.title = `${toHex(c)} — この色に変換されます（右クリックで削除）`
     sw.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       deleteColor(i)
@@ -197,14 +196,13 @@ function renderPalette(pal: Palette): void {
 
 // スウォッチの active 表示だけ更新（再生成せず軽量に・両コンテナ）
 function renderSwatchesActiveOnly(pal: Palette): void {
-  for (const container of [swatches, editorSwatches]) {
-    const nodes = container.querySelectorAll<HTMLElement>('.swatch')
-    pal.colors.forEach((_c, i) => {
-      const node = nodes[i]
-      if (!node) return
-      node.classList.toggle('active', i === selectedSwatch)
-    })
-  }
+  // 選択リングは編集側パレットのみ（左の変換用パレットには出さない）
+  const nodes = editorSwatches.querySelectorAll<HTMLElement>('.swatch')
+  pal.colors.forEach((_c, i) => {
+    const node = nodes[i]
+    if (!node) return
+    node.classList.toggle('active', i === selectedSwatch)
+  })
 }
 
 // 現在のパレットを編集可能な自作パレットへ引き上げる
@@ -431,9 +429,17 @@ function drawOutput(): void {
   const ctx = outCanvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, outCanvas.width, outCanvas.height)
-  // オニオンスキン: 前フレームを薄く下に敷く
-  if (onionToggle.checked && currentFrame > 0 && frames[currentFrame - 1]) {
-    ctx.globalAlpha = Number(onionOpacity.value)
+  // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。
+  const rm = refMode.value
+  const alpha = Number(onionOpacity.value)
+  if (rm === 'source' && sourceImage) {
+    ctx.globalAlpha = alpha
+    ctx.imageSmoothingEnabled = true // 写真はなめらかに敷く（位置合わせの下絵用）
+    ctx.drawImage(imageToCanvas(sourceImage), 0, 0, outCanvas.width, outCanvas.height)
+    ctx.imageSmoothingEnabled = false
+    ctx.globalAlpha = 1
+  } else if (rm === 'prev' && currentFrame > 0 && frames[currentFrame - 1]) {
+    ctx.globalAlpha = alpha
     ctx.drawImage(imageToCanvas(frames[currentFrame - 1]), 0, 0, outCanvas.width, outCanvas.height)
     ctx.globalAlpha = 1
   }
@@ -923,7 +929,7 @@ frameDel.addEventListener('click', () => {
   frames.splice(currentFrame, 1)
   gotoFrame(Math.min(currentFrame, frames.length - 1))
 })
-onionToggle.addEventListener('change', drawOutput)
+refMode.addEventListener('change', drawOutput)
 onionOpacity.addEventListener('input', drawOutput)
 
 // スプライトシート書き出し（全フレームを横並び）

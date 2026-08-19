@@ -3,6 +3,10 @@
 // 透明画素は無視して背景色でパレットが汚れないようにする。
 import type { Palette, PaletteColor, PixelImage } from '../types'
 import { rgbToLab, srgbToLinear } from '../color/space'
+import { deltaE76 } from '../color/delta'
+
+// これ未満の色差(ΔE)は「同じ色」とみなして統合する（黒が何個も並ぶのを防ぐ）
+const MERGE_DELTA_E = 6
 
 function makeColor(r: number, g: number, b: number): PaletteColor {
   return { r, g, b, lab: rgbToLab(r, g, b), lr: srgbToLinear(r), lg: srgbToLinear(g), lb: srgbToLinear(b) }
@@ -92,13 +96,10 @@ export function medianCutPalette(img: PixelImage, maxColors: number): Palette {
     }
     return makeColor(Math.round(r / cnt), Math.round(g / cnt), Math.round(b / cnt))
   })
-  // 同色（画像の色数が要求数より少ない場合に発生）を除去し、ユニークな色だけにする
-  const seen = new Set<string>()
-  const unique = colors.filter((c) => {
-    const k = `${c.r},${c.g},${c.b}`
-    if (seen.has(k)) return false
-    seen.add(k)
-    return true
-  })
-  return { id: '__adaptive', name: `自動 (${unique.length}色)`, colors: unique }
+  // 近似色を統合（完全一致だけでなく、知覚的に近い色＝黒が複数などをまとめる）
+  const kept: PaletteColor[] = []
+  for (const c of colors) {
+    if (!kept.some((k) => deltaE76(k.lab, c.lab) < MERGE_DELTA_E)) kept.push(c)
+  }
+  return { id: '__adaptive', name: `自動 (${kept.length}色)`, colors: kept }
 }
