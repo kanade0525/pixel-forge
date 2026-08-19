@@ -73,6 +73,7 @@ let lastResult: PixelImage | null = null
 type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
 let tool: Tool = 'pencil'
 let paint = { r: 0, g: 0, b: 0 } // 描く色
+let selectedSwatch = -1 // 選択中スウォッチの index（同色重複でも1つだけ強調）
 let showGrid = false
 let painting = false
 let paintInitialized = false
@@ -126,12 +127,12 @@ function renderSwatches(pal: Palette): void {
     const sw = document.createElement('button')
     sw.type = 'button'
     sw.className = 'swatch'
-    if (c.r === paint.r && c.g === paint.g && c.b === paint.b) sw.classList.add('active')
+    if (i === selectedSwatch) sw.classList.add('active')
     sw.style.background = `rgb(${c.r},${c.g},${c.b})`
     sw.setAttribute('role', 'listitem')
     sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}（クリックで描く色に）`)
     sw.title = `${toHex(c)}（クリックで描く色に / 右クリックで削除）`
-    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b))
+    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b, i))
     sw.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       deleteColor(i)
@@ -140,12 +141,14 @@ function renderSwatches(pal: Palette): void {
   })
 }
 
-function setPaintColor(r: number, g: number, b: number): void {
+// index を渡すとそのスウォッチを選択状態に（同色重複対策）。省略時は最初の一致 or 非選択。
+function setPaintColor(r: number, g: number, b: number, index = -1): void {
   paint = { r, g, b }
   paintColorInput.value = toHex(paint)
-  // アクティブなスウォッチ表示を更新
   const cur = activePalette()
-  if (cur) renderSwatchesActiveOnly(cur)
+  selectedSwatch =
+    index >= 0 ? index : cur.colors.findIndex((c) => c.r === r && c.g === g && c.b === b)
+  renderSwatchesActiveOnly(cur)
 }
 
 // 編集エリア側のスウォッチ（描く色の候補・クリックで選択のみ）
@@ -155,12 +158,12 @@ function renderEditorSwatches(pal: Palette): void {
     const sw = document.createElement('button')
     sw.type = 'button'
     sw.className = 'swatch'
-    if (c.r === paint.r && c.g === paint.g && c.b === paint.b) sw.classList.add('active')
+    if (i === selectedSwatch) sw.classList.add('active')
     sw.style.background = `rgb(${c.r},${c.g},${c.b})`
     sw.setAttribute('role', 'listitem')
     sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}`)
     sw.title = `${toHex(c)}`
-    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b))
+    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b, i))
     editorSwatches.appendChild(sw)
   })
 }
@@ -175,10 +178,10 @@ function renderPalette(pal: Palette): void {
 function renderSwatchesActiveOnly(pal: Palette): void {
   for (const container of [swatches, editorSwatches]) {
     const nodes = container.querySelectorAll<HTMLElement>('.swatch')
-    pal.colors.forEach((c, i) => {
+    pal.colors.forEach((_c, i) => {
       const node = nodes[i]
       if (!node) return
-      node.classList.toggle('active', c.r === paint.r && c.g === paint.g && c.b === paint.b)
+      node.classList.toggle('active', i === selectedSwatch)
     })
   }
 }
@@ -349,7 +352,7 @@ function render(): void {
   // 初回は描く色をパレット先頭色にしておく（黒固定より編集しやすい）
   if (!paintInitialized && palette.colors.length) {
     const c0 = palette.colors[0]
-    setPaintColor(c0.r, c0.g, c0.b)
+    setPaintColor(c0.r, c0.g, c0.b, 0)
     paintInitialized = true
   }
 
