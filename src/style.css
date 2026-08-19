@@ -358,6 +358,89 @@ details summary {
   outline-offset: 1px;
 }
 
+/* フレームバー */
+.frame-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+.frame-bar button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.frame-bar button:hover {
+  background: var(--surface-2);
+}
+.frame-bar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.frame-label {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 3.5em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.link-btn:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+/* 拡大編集モーダル */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+.modal-inner {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  max-width: 95vw;
+  max-height: 92vh;
+  overflow: auto;
+  position: relative;
+}
+.modal-close {
+  position: sticky;
+  top: 0;
+  float: right;
+  margin-bottom: 8px;
+  z-index: 1;
+}
+.modal-slot .canvas-wrap {
+  max-height: 74vh;
+  overflow: auto;
+}
+/* モーダル中は出力キャンバスを大きく（中央寄せ・スクロール可） */
+.modal-slot #outCanvas {
+  max-width: none;
+}
+
 /* 編集エリアのパレット（描く色の候補） */
 .editor-palette {
   margin-bottom: 8px;

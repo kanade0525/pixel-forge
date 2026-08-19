@@ -92,5 +92,13 @@ export function medianCutPalette(img: PixelImage, maxColors: number): Palette {
     }
     return makeColor(Math.round(r / cnt), Math.round(g / cnt), Math.round(b / cnt))
   })
-  return { id: '__adaptive', name: `自動 (${colors.length}色)`, colors }
+  // 同色（画像の色数が要求数より少ない場合に発生）を除去し、ユニークな色だけにする
+  const seen = new Set<string>()
+  const unique = colors.filter((c) => {
+    const k = `${c.r},${c.g},${c.b}`
+    if (seen.has(k)) return false
+    seen.add(k)
+    return true
+  })
+  return { id: '__adaptive', name: `自動 (${unique.length}色)`, colors: unique }
 }

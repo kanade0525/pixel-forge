@@ -164,8 +164,11 @@
                   <canvas id="srcCanvas" role="img" aria-label="入力画像"></canvas>
                 </div>
               </figure>
-              <figure>
-                <figcaption>出力（<span id="outLabel">16×16</span>・クリック/ドラッグで編集）</figcaption>
+              <figure id="outputFigure">
+                <figcaption>
+                  出力（<span id="outLabel">16×16</span>・クリック/ドラッグで編集）
+                  <button id="openModal" class="link-btn" type="button" disabled>⤢ 拡大編集</button>
+                </figcaption>
                 <div class="editor-toolbar" id="editorToolbar">
                   <div class="tool-group">
                     <button class="tool active" data-tool="pencil" title="ペン">✏️ ペン</button>
@@ -186,11 +189,30 @@
                   </div>
                   <label class="grid-toggle"><input id="gridToggle" type="checkbox" /> グリッド</label>
                 </div>
+
+                <div class="frame-bar" id="frameBar">
+                  <div class="tool-group">
+                    <button id="framePrev" title="前のフレーム" disabled>◀</button>
+                    <span id="frameLabel" class="frame-label">1 / 1</span>
+                    <button id="frameNext" title="次のフレーム" disabled>▶</button>
+                  </div>
+                  <div class="tool-group">
+                    <button id="frameDup" title="現在を複製して追加" disabled>＋複製</button>
+                    <button id="frameBlank" title="空フレームを追加" disabled>＋空</button>
+                    <button id="frameDel" title="このフレームを削除" disabled>🗑</button>
+                  </div>
+                  <label class="grid-toggle" title="前フレームを薄く重ねて表示">
+                    <input id="onionToggle" type="checkbox" /> オニオン
+                  </label>
+                  <input id="onionOpacity" type="range" min="0.1" max="0.7" step="0.05" value="0.35" title="オニオンの濃さ" />
+                  <button id="sheetExport" title="全フレームを横並びPNGで書き出し" disabled>シート書き出し</button>
+                </div>
+
                 <div class="editor-palette">
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>
                   <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
                 </div>
-                <div class="canvas-wrap checker">
+                <div class="canvas-wrap checker" id="canvasWrap">
                   <canvas id="outCanvas" aria-label="変換後のドット絵（クリック/ドラッグで編集）"></canvas>
                   <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>
                 </div>
@@ -232,6 +254,14 @@
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- 拡大編集モーダル（出力figureをここへ移動して大きく編集） -->
+    <div id="editModal" class="modal" hidden>
+      <div class="modal-inner">
+        <button id="closeModal" class="btn modal-close" type="button">✕ 閉じる</button>
+        <div class="modal-slot" id="modalSlot"></div>
+      </div>
+    </div>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

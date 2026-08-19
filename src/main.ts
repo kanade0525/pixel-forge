@@ -32,6 +32,22 @@ const redoBtn = $<HTMLButtonElement>('redoBtn')
 const flipHBtn = $<HTMLButtonElement>('flipH')
 const flipVBtn = $<HTMLButtonElement>('flipV')
 const gridToggle = $<HTMLInputElement>('gridToggle')
+// フレーム / オニオン / モーダル
+const outputFigure = $('outputFigure')
+const previewGridEl = outputFigure.parentElement as HTMLElement
+const framePrev = $<HTMLButtonElement>('framePrev')
+const frameNext = $<HTMLButtonElement>('frameNext')
+const frameLabel = $('frameLabel')
+const frameDup = $<HTMLButtonElement>('frameDup')
+const frameBlank = $<HTMLButtonElement>('frameBlank')
+const frameDel = $<HTMLButtonElement>('frameDel')
+const onionToggle = $<HTMLInputElement>('onionToggle')
+const onionOpacity = $<HTMLInputElement>('onionOpacity')
+const sheetExportBtn = $<HTMLButtonElement>('sheetExport')
+const openModalBtn = $<HTMLButtonElement>('openModal')
+const closeModalBtn = $<HTMLButtonElement>('closeModal')
+const editModal = $('editModal')
+const modalSlot = $('modalSlot')
 const applyCustom = $<HTMLButtonElement>('applyCustom')
 const customStatus = $('customStatus')
 const ditherHelp = $('ditherHelp')
@@ -67,7 +83,12 @@ const HARD_MAX_AREA = HARD_MAX_MP * 1_000_000
 let sourceImage: PixelImage | null = null
 let customPal: Palette | null = null
 let lastAdaptive: Palette | null = null
-let lastResult: PixelImage | null = null
+let lastResult: PixelImage | null = null // = frames[currentFrame]（現在編集中のフレーム）
+
+// --- フレーム / モーダル ---
+let frames: PixelImage[] = []
+let currentFrame = 0
+let isModal = false
 
 // --- レタッチ・エディタ状態 ---
 type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
@@ -356,12 +377,21 @@ function render(): void {
     paintInitialized = true
   }
 
-  lastResult = quantizeImage(small, { ...opts, palette })
+  const result = quantizeImage(small, { ...opts, palette })
+  // フレームに反映（サイズ変更時はフレーム一式をリセット、それ以外は現在フレームを置換）
+  if (frames.length === 0 || frames[0].width !== result.width || frames[0].height !== result.height) {
+    frames = [result]
+    currentFrame = 0
+  } else {
+    frames[currentFrame] = result
+  }
+  lastResult = frames[currentFrame]
   const ms = performance.now() - t0
 
   outLabel.textContent = `${opts.targetW}×${opts.targetH}`
   resetHistory() // 再変換で編集内容は破棄される
   drawOutput()
+  updateFrameUI()
 
   infoOut.textContent = `${opts.targetW}×${opts.targetH}px`
   infoColors.textContent = `${palette.colors.length}色`
@@ -382,16 +412,33 @@ function updateExportSizeLabel(): void {
   infoExport.textContent = sourceImage ? label : '—'
 }
 
-function previewZoom(img: PixelImage): number {
-  return Math.max(1, Math.min(24, Math.floor(300 / Math.max(img.width, img.height))))
+// 表示ズーム。通常は最大300px、拡大編集モーダル中はビューポートに合わせて大きく。
+function editZoom(): number {
+  if (!lastResult) return 1
+  const maxDim = isModal
+    ? Math.min(window.innerWidth * 0.6, window.innerHeight * 0.78)
+    : 320
+  return Math.max(1, Math.min(40, Math.floor(maxDim / Math.max(lastResult.width, lastResult.height))))
 }
 
 let currentZoom = 1
 function drawOutput(): void {
   if (!lastResult) return
-  currentZoom = previewZoom(lastResult)
-  drawScaled(outCanvas, lastResult, currentZoom)
-  if (showGrid && currentZoom >= 4) drawGrid()
+  currentZoom = editZoom()
+  const zoom = currentZoom
+  outCanvas.width = lastResult.width * zoom
+  outCanvas.height = lastResult.height * zoom
+  const ctx = outCanvas.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  ctx.clearRect(0, 0, outCanvas.width, outCanvas.height)
+  // オニオンスキン: 前フレームを薄く下に敷く
+  if (onionToggle.checked && currentFrame > 0 && frames[currentFrame - 1]) {
+    ctx.globalAlpha = Number(onionOpacity.value)
+    ctx.drawImage(imageToCanvas(frames[currentFrame - 1]), 0, 0, outCanvas.width, outCanvas.height)
+    ctx.globalAlpha = 1
+  }
+  ctx.drawImage(imageToCanvas(lastResult), 0, 0, outCanvas.width, outCanvas.height)
+  if (showGrid && zoom >= 4) drawGrid()
 }
 
 function drawGrid(): void {
@@ -411,16 +458,6 @@ function drawGrid(): void {
     ctx.lineTo(outCanvas.width, py)
   }
   ctx.stroke()
-}
-
-function drawScaled(canvas: HTMLCanvasElement, img: PixelImage, zoom: number): void {
-  const small = imageToCanvas(img)
-  canvas.width = img.width * zoom
-  canvas.height = img.height * zoom
-  const ctx = canvas.getContext('2d')!
-  ctx.imageSmoothingEnabled = false
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
-  ctx.drawImage(small, 0, 0, canvas.width, canvas.height)
 }
 
 function imageToCanvas(img: PixelImage): HTMLCanvasElement {
@@ -745,8 +782,36 @@ function selectTool(t: Tool): void {
 editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((btn) => {
   btn.addEventListener('click', () => selectTool(btn.dataset.tool as Tool))
 })
+// ツール別カーソル（SVGデータURI・ホットスポット付き）
+const CURSORS: Record<Tool, { svg: string; hx: number; hy: number; fb: string }> = {
+  pencil: {
+    svg: "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><path d='M2 16l1-4L12 3l3 3L7 15z' fill='#ffd54a' stroke='#000'/><path d='M11 4l3 3' stroke='#000'/></svg>",
+    hx: 1,
+    hy: 16,
+    fb: 'crosshair',
+  },
+  eraser: {
+    svg: "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><rect x='2' y='6' width='12' height='8' rx='1.5' fill='#ff9a9a' stroke='#000'/></svg>",
+    hx: 8,
+    hy: 10,
+    fb: 'cell',
+  },
+  bucket: {
+    svg: "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><path d='M3 9l6-6 6 6-6 6z' fill='#7fb0ff' stroke='#000'/><path d='M15 12c1.2 1.2 1.2 3 0 3s-1.2-1.8 0-3z' fill='#7fb0ff' stroke='#000'/></svg>",
+    hx: 9,
+    hy: 15,
+    fb: 'copy',
+  },
+  eyedropper: {
+    svg: "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><path d='M2 16l1-3 8-8 2 2-8 8z' fill='#bde0fe' stroke='#000'/><rect x='11' y='1' width='5' height='4' rx='1' transform='rotate(45 13 3)' fill='#999' stroke='#000'/></svg>",
+    hx: 1,
+    hy: 16,
+    fb: 'crosshair',
+  },
+}
 function updateCanvasCursor(): void {
-  outCanvas.style.cursor = tool === 'eyedropper' ? 'copy' : 'crosshair'
+  const c = CURSORS[tool]
+  outCanvas.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(c.svg)}") ${c.hx} ${c.hy}, ${c.fb}`
 }
 
 paintColorInput.addEventListener('input', () => {
@@ -812,6 +877,105 @@ window.addEventListener('keydown', (e) => {
   }
 })
 
+// ============================================================
+// フレーム（アニメ用）＋ オニオンスキン ＋ 拡大モーダル
+// ============================================================
+function copyFrame(f: PixelImage): PixelImage {
+  return { width: f.width, height: f.height, data: f.data.slice() }
+}
+function blankFrame(w: number, h: number): PixelImage {
+  return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
+}
+function gotoFrame(i: number): void {
+  currentFrame = Math.max(0, Math.min(frames.length - 1, i))
+  lastResult = frames[currentFrame]
+  resetHistory()
+  drawOutput()
+  updateFrameUI()
+}
+function updateFrameUI(): void {
+  const n = frames.length
+  frameLabel.textContent = `${n === 0 ? 0 : currentFrame + 1} / ${n}`
+  const has = n > 0 && !!lastResult
+  framePrev.disabled = currentFrame <= 0
+  frameNext.disabled = currentFrame >= n - 1
+  frameDel.disabled = n <= 1
+  frameDup.disabled = !has
+  frameBlank.disabled = !has
+  sheetExportBtn.disabled = !has
+  openModalBtn.disabled = !has
+}
+
+framePrev.addEventListener('click', () => gotoFrame(currentFrame - 1))
+frameNext.addEventListener('click', () => gotoFrame(currentFrame + 1))
+frameDup.addEventListener('click', () => {
+  if (!lastResult) return
+  frames.splice(currentFrame + 1, 0, copyFrame(lastResult))
+  gotoFrame(currentFrame + 1)
+})
+frameBlank.addEventListener('click', () => {
+  if (!lastResult) return
+  frames.splice(currentFrame + 1, 0, blankFrame(lastResult.width, lastResult.height))
+  gotoFrame(currentFrame + 1)
+})
+frameDel.addEventListener('click', () => {
+  if (frames.length <= 1) return
+  frames.splice(currentFrame, 1)
+  gotoFrame(Math.min(currentFrame, frames.length - 1))
+})
+onionToggle.addEventListener('change', drawOutput)
+onionOpacity.addEventListener('input', drawOutput)
+
+// スプライトシート書き出し（全フレームを横並び）
+sheetExportBtn.addEventListener('click', () => {
+  if (frames.length === 0) return
+  const scale = Number(exportScaleSel.value)
+  const w = frames[0].width
+  const h = frames[0].height
+  const sheet = document.createElement('canvas')
+  sheet.width = w * frames.length * scale
+  sheet.height = h * scale
+  const ctx = sheet.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  frames.forEach((f, i) => {
+    ctx.drawImage(imageToCanvas(f), i * w * scale, 0, w * scale, h * scale)
+  })
+  const name = `pixelforge_sheet_${frames.length}f_${w}x${h}_x${scale}.png`
+  sheet.toBlob((blob) => {
+    if (!blob) return
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    showToast(`${name} を保存しました`)
+  }, 'image/png')
+})
+
+// 拡大編集モーダル: 出力figureをモーダルへ移動して大きく編集
+function openModal(): void {
+  if (!lastResult) return
+  modalSlot.appendChild(outputFigure)
+  editModal.hidden = false
+  isModal = true
+  drawOutput()
+}
+function closeModal(): void {
+  previewGridEl.appendChild(outputFigure) // 入力figureの後ろ（2番目）に戻る
+  editModal.hidden = true
+  isModal = false
+  drawOutput()
+}
+openModalBtn.addEventListener('click', openModal)
+closeModalBtn.addEventListener('click', closeModal)
+editModal.addEventListener('click', (e) => {
+  if (e.target === editModal) closeModal() // 背景クリックで閉じる
+})
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && isModal) closeModal()
+})
+
 // --- 初期表示 ---
 updatePaletteUI()
 updateVisibility()
@@ -819,4 +983,5 @@ updateExportSizeLabel()
 setPaintColor(paint.r, paint.g, paint.b)
 updateCanvasCursor()
 updateUndoRedo()
+updateFrameUI()
 if (!isAdaptive()) renderPalette(activePalette())
