@@ -75,10 +75,9 @@
             </div>
             <div id="swatches" class="swatches" role="list" aria-label="パレットの色"></div>
             <div class="field-row">
-              <button id="addColor" class="btn" type="button">＋ 色を追加</button>
-              <span class="hint-inline">クリックで編集 / 右クリックで削除</span>
+              <button id="addColor" class="btn" type="button">＋ 描く色を追加</button>
+              <span class="hint-inline">クリックで描く色に / 右クリックで削除</span>
             </div>
-            <input id="swatchColor" type="color" class="visually-hidden" aria-hidden="true" tabindex="-1" />
             <details>
               <summary>自作パレット（HEX / .gpl）</summary>
               <textarea
@@ -165,9 +164,25 @@
                 </div>
               </figure>
               <figure>
-                <figcaption>出力（<span id="outLabel">16×16</span>・拡大表示）</figcaption>
+                <figcaption>出力（<span id="outLabel">16×16</span>・クリック/ドラッグで編集）</figcaption>
+                <div class="editor-toolbar" id="editorToolbar">
+                  <div class="tool-group">
+                    <button class="tool active" data-tool="pencil" title="ペン">✏️ ペン</button>
+                    <button class="tool" data-tool="eraser" title="消しゴム（透明化）">⌫ 消しゴム</button>
+                    <button class="tool" data-tool="bucket" title="塗りつぶし">🪣 塗り</button>
+                    <button class="tool" data-tool="eyedropper" title="スポイト">💧 スポイト</button>
+                  </div>
+                  <label class="paint-color" title="描く色">
+                    色 <input id="paintColor" type="color" value="#000000" />
+                  </label>
+                  <div class="tool-group">
+                    <button id="undoBtn" title="元に戻す (Ctrl+Z)" disabled>↶ 戻す</button>
+                    <button id="redoBtn" title="やり直し (Ctrl+Y)" disabled>↷ やり直し</button>
+                  </div>
+                  <label class="grid-toggle"><input id="gridToggle" type="checkbox" /> グリッド</label>
+                </div>
                 <div class="canvas-wrap checker">
-                  <canvas id="outCanvas" role="img" aria-label="変換後のドット絵"></canvas>
+                  <canvas id="outCanvas" aria-label="変換後のドット絵（クリック/ドラッグで編集）"></canvas>
                   <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>
                 </div>
               </figure>

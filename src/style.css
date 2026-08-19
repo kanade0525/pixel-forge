@@ -296,6 +296,68 @@ details summary {
   margin-top: 6px;
 }
 
+/* エディタ ツールバー */
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+.tool-group {
+  display: inline-flex;
+  gap: 4px;
+}
+.editor-toolbar button {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.editor-toolbar button:hover {
+  background: var(--surface-2);
+}
+.editor-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.editor-toolbar .tool.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.paint-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.paint-color input[type='color'] {
+  width: 30px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.grid-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.swatch.active {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
 /* プレビュー */
 .preview-grid {
   display: grid;

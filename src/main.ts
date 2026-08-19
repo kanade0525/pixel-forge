@@ -22,8 +22,13 @@ const adaptiveRow = $('adaptiveRow')
 const adaptiveCount = $<HTMLSelectElement>('adaptiveCount')
 const swatches = $('swatches')
 const addColorBtn = $<HTMLButtonElement>('addColor')
-const swatchColor = $<HTMLInputElement>('swatchColor')
 const customPaletteText = $<HTMLTextAreaElement>('customPalette')
+// エディタ（レタッチ）
+const paintColorInput = $<HTMLInputElement>('paintColor')
+const editorToolbar = $('editorToolbar')
+const undoBtn = $<HTMLButtonElement>('undoBtn')
+const redoBtn = $<HTMLButtonElement>('redoBtn')
+const gridToggle = $<HTMLInputElement>('gridToggle')
 const applyCustom = $<HTMLButtonElement>('applyCustom')
 const customStatus = $('customStatus')
 const ditherHelp = $('ditherHelp')
@@ -60,7 +65,18 @@ let sourceImage: PixelImage | null = null
 let customPal: Palette | null = null
 let lastAdaptive: Palette | null = null
 let lastResult: PixelImage | null = null
-let editingIndex = -1
+
+// --- レタッチ・エディタ状態 ---
+type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
+let tool: Tool = 'pencil'
+let paint = { r: 0, g: 0, b: 0 } // 描く色
+let showGrid = false
+let painting = false
+let lastPx = -1
+let lastPy = -1
+const undoStack: Uint8ClampedArray[] = []
+const redoStack: Uint8ClampedArray[] = []
+const MAX_HISTORY = 40
 
 const DITHER_HELP: Record<DitherMode, string> = {
   none: '最近色へ置換（ディザなし）。色段差（バンディング）が出やすい。',
@@ -106,16 +122,35 @@ function renderSwatches(pal: Palette): void {
     const sw = document.createElement('button')
     sw.type = 'button'
     sw.className = 'swatch'
+    if (c.r === paint.r && c.g === paint.g && c.b === paint.b) sw.classList.add('active')
     sw.style.background = `rgb(${c.r},${c.g},${c.b})`
     sw.setAttribute('role', 'listitem')
-    sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}（クリックで編集）`)
-    sw.title = `${toHex(c)}（クリックで編集 / 右クリックで削除）`
-    sw.addEventListener('click', () => beginEditColor(i))
+    sw.setAttribute('aria-label', `色 ${i + 1}: ${toHex(c)}（クリックで描く色に）`)
+    sw.title = `${toHex(c)}（クリックで描く色に / 右クリックで削除）`
+    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b))
     sw.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       deleteColor(i)
     })
     swatches.appendChild(sw)
+  })
+}
+
+function setPaintColor(r: number, g: number, b: number): void {
+  paint = { r, g, b }
+  paintColorInput.value = toHex(paint)
+  // アクティブなスウォッチ表示を更新
+  const cur = activePalette()
+  if (cur) renderSwatchesActiveOnly(cur)
+}
+
+// スウォッチの active 表示だけ更新（再生成せず軽量に）
+function renderSwatchesActiveOnly(pal: Palette): void {
+  const nodes = swatches.querySelectorAll<HTMLElement>('.swatch')
+  pal.colors.forEach((c, i) => {
+    const node = nodes[i]
+    if (!node) return
+    node.classList.toggle('active', c.r === paint.r && c.g === paint.g && c.b === paint.b)
   })
 }
 
@@ -142,20 +177,6 @@ function refreshCustomLabel(): void {
   if (opt) opt.textContent = customPal.name
 }
 
-function beginEditColor(index: number): void {
-  const pal = ensureCustom()
-  editingIndex = index
-  swatchColor.value = toHex(pal.colors[index])
-  swatchColor.click()
-}
-
-swatchColor.addEventListener('input', () => {
-  if (!customPal || editingIndex < 0) return
-  customPal.colors[editingIndex] = hexToPaletteColor(swatchColor.value)
-  renderSwatches(customPal)
-  scheduleRender()
-})
-
 function deleteColor(index: number): void {
   const pal = ensureCustom()
   if (pal.colors.length <= 1) {
@@ -163,15 +184,15 @@ function deleteColor(index: number): void {
     return
   }
   pal.colors.splice(index, 1)
-  editingIndex = -1
   refreshCustomLabel()
   renderSwatches(pal)
   scheduleRender()
 }
 
+// 現在の描く色をパレットへ追加
 addColorBtn.addEventListener('click', () => {
   const pal = ensureCustom()
-  pal.colors.push(hexToPaletteColor('#808080'))
+  pal.colors.push(hexToPaletteColor(toHex(paint)))
   refreshCustomLabel()
   renderSwatches(pal)
   scheduleRender()
@@ -300,7 +321,8 @@ function render(): void {
   const ms = performance.now() - t0
 
   outLabel.textContent = `${opts.targetW}×${opts.targetH}`
-  drawScaled(outCanvas, lastResult, previewZoom(lastResult))
+  resetHistory() // 再変換で編集内容は破棄される
+  drawOutput()
 
   infoOut.textContent = `${opts.targetW}×${opts.targetH}px`
   infoColors.textContent = `${palette.colors.length}色`
@@ -320,6 +342,33 @@ function updateExportSizeLabel(): void {
 
 function previewZoom(img: PixelImage): number {
   return Math.max(1, Math.min(24, Math.floor(300 / Math.max(img.width, img.height))))
+}
+
+let currentZoom = 1
+function drawOutput(): void {
+  if (!lastResult) return
+  currentZoom = previewZoom(lastResult)
+  drawScaled(outCanvas, lastResult, currentZoom)
+  if (showGrid && currentZoom >= 4) drawGrid()
+}
+
+function drawGrid(): void {
+  if (!lastResult) return
+  const ctx = outCanvas.getContext('2d')!
+  ctx.strokeStyle = 'rgba(128,128,128,0.45)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let x = 0; x <= lastResult.width; x++) {
+    const px = x * currentZoom + 0.5
+    ctx.moveTo(px, 0)
+    ctx.lineTo(px, outCanvas.height)
+  }
+  for (let y = 0; y <= lastResult.height; y++) {
+    const py = y * currentZoom + 0.5
+    ctx.moveTo(0, py)
+    ctx.lineTo(outCanvas.width, py)
+  }
+  ctx.stroke()
 }
 
 function drawScaled(canvas: HTMLCanvasElement, img: PixelImage, zoom: number): void {
@@ -465,7 +514,6 @@ applyCustom.addEventListener('click', () => {
   }
   opt.textContent = `自作パレット (${pal.colors.length}色)`
   paletteSelect.value = '__custom'
-  editingIndex = -1
   customStatus.textContent = `${pal.colors.length}色を読み込みました`
   renderSwatches(pal)
   scheduleRender()
@@ -473,8 +521,207 @@ applyCustom.addEventListener('click', () => {
 
 exportBtn.addEventListener('click', exportPng)
 
+// ============================================================
+// レタッチ・エディタ（出力画像をピクセル単位で編集）
+// ============================================================
+
+function eventToPixel(e: PointerEvent): { x: number; y: number } | null {
+  if (!lastResult) return null
+  const rect = outCanvas.getBoundingClientRect()
+  const x = Math.floor(((e.clientX - rect.left) / rect.width) * lastResult.width)
+  const y = Math.floor(((e.clientY - rect.top) / rect.height) * lastResult.height)
+  if (x < 0 || y < 0 || x >= lastResult.width || y >= lastResult.height) return null
+  return { x, y }
+}
+
+function paintPixel(x: number, y: number): void {
+  if (!lastResult) return
+  const i = (y * lastResult.width + x) * 4
+  const d = lastResult.data
+  if (tool === 'eraser') {
+    d[i + 3] = 0
+  } else {
+    d[i] = paint.r
+    d[i + 1] = paint.g
+    d[i + 2] = paint.b
+    d[i + 3] = 255
+  }
+}
+
+// 2点間を線で塗る（ドラッグ時の隙間防止・Bresenham）
+function strokeLine(x0: number, y0: number, x1: number, y1: number): void {
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+  let x = x0
+  let y = y0
+  for (;;) {
+    paintPixel(x, y)
+    if (x === x1 && y === y1) break
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y += sy
+    }
+  }
+}
+
+function pickColor(x: number, y: number): void {
+  if (!lastResult) return
+  const i = (y * lastResult.width + x) * 4
+  const d = lastResult.data
+  if (d[i + 3] === 0) return // 透明はスポイトしない
+  setPaintColor(d[i], d[i + 1], d[i + 2])
+  selectTool('pencil') // スポイト後はペンに戻す
+}
+
+function bucketFill(sx: number, sy: number): void {
+  if (!lastResult) return
+  const w = lastResult.width
+  const h = lastResult.height
+  const d = lastResult.data
+  const si = (sy * w + sx) * 4
+  const tr = d[si]
+  const tg = d[si + 1]
+  const tb = d[si + 2]
+  const ta = d[si + 3]
+  const nr = tool === 'eraser' ? tr : paint.r
+  const ng = tool === 'eraser' ? tg : paint.g
+  const nb = tool === 'eraser' ? tb : paint.b
+  const na = tool === 'eraser' ? 0 : 255
+  if (tr === nr && tg === ng && tb === nb && ta === na) return // 変化なし
+  const stack = [[sx, sy]]
+  while (stack.length) {
+    const [x, y] = stack.pop()!
+    if (x < 0 || y < 0 || x >= w || y >= h) continue
+    const i = (y * w + x) * 4
+    if (d[i] !== tr || d[i + 1] !== tg || d[i + 2] !== tb || d[i + 3] !== ta) continue
+    d[i] = nr
+    d[i + 1] = ng
+    d[i + 2] = nb
+    d[i + 3] = na
+    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
+  }
+}
+
+// --- 履歴 ---
+function pushUndo(): void {
+  if (!lastResult) return
+  undoStack.push(lastResult.data.slice())
+  if (undoStack.length > MAX_HISTORY) undoStack.shift()
+  redoStack.length = 0
+  updateUndoRedo()
+}
+function undo(): void {
+  if (!lastResult || undoStack.length === 0) return
+  redoStack.push(lastResult.data.slice())
+  lastResult.data.set(undoStack.pop()!)
+  drawOutput()
+  updateUndoRedo()
+}
+function redo(): void {
+  if (!lastResult || redoStack.length === 0) return
+  undoStack.push(lastResult.data.slice())
+  lastResult.data.set(redoStack.pop()!)
+  drawOutput()
+  updateUndoRedo()
+}
+function resetHistory(): void {
+  undoStack.length = 0
+  redoStack.length = 0
+  updateUndoRedo()
+}
+function updateUndoRedo(): void {
+  undoBtn.disabled = undoStack.length === 0
+  redoBtn.disabled = redoStack.length === 0
+}
+
+// --- ポインタ操作 ---
+outCanvas.addEventListener('pointerdown', (e) => {
+  if (!lastResult) return
+  const p = eventToPixel(e)
+  if (!p) return
+  e.preventDefault()
+  if (tool === 'eyedropper') {
+    pickColor(p.x, p.y)
+    return
+  }
+  if (tool === 'bucket') {
+    pushUndo()
+    bucketFill(p.x, p.y)
+    drawOutput()
+    return
+  }
+  pushUndo()
+  painting = true
+  lastPx = p.x
+  lastPy = p.y
+  outCanvas.setPointerCapture(e.pointerId)
+  paintPixel(p.x, p.y)
+  drawOutput()
+})
+outCanvas.addEventListener('pointermove', (e) => {
+  if (!painting || !lastResult) return
+  const p = eventToPixel(e)
+  if (!p) return
+  strokeLine(lastPx, lastPy, p.x, p.y)
+  lastPx = p.x
+  lastPy = p.y
+  drawOutput()
+})
+const endStroke = () => {
+  painting = false
+}
+outCanvas.addEventListener('pointerup', endStroke)
+outCanvas.addEventListener('pointercancel', endStroke)
+
+// --- ツール選択 ---
+function selectTool(t: Tool): void {
+  tool = t
+  editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((b) => {
+    b.classList.toggle('active', b.dataset.tool === t)
+  })
+  updateCanvasCursor()
+}
+editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((btn) => {
+  btn.addEventListener('click', () => selectTool(btn.dataset.tool as Tool))
+})
+function updateCanvasCursor(): void {
+  outCanvas.style.cursor = tool === 'eyedropper' ? 'copy' : 'crosshair'
+}
+
+paintColorInput.addEventListener('input', () => {
+  const c = hexToPaletteColor(paintColorInput.value)
+  setPaintColor(c.r, c.g, c.b)
+})
+gridToggle.addEventListener('change', () => {
+  showGrid = gridToggle.checked
+  drawOutput()
+})
+undoBtn.addEventListener('click', undo)
+redoBtn.addEventListener('click', redo)
+window.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return
+  if (e.key === 'z' && !e.shiftKey) {
+    e.preventDefault()
+    undo()
+  } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
+    e.preventDefault()
+    redo()
+  }
+})
+
 // --- 初期表示 ---
 updatePaletteUI()
 updateVisibility()
 updateExportSizeLabel()
+setPaintColor(paint.r, paint.g, paint.b)
+updateCanvasCursor()
+updateUndoRedo()
 if (!isAdaptive()) renderSwatches(activePalette())
