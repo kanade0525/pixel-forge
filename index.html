@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pixel Forge — 画像→ピクセルアート変換</title>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Pixel Forge</h1>
+      <p class="tagline">画像 → ドット絵（Lab最近色 ＋ ベイヤー / フロイド–スタインバーグ）</p>
+    </header>
+
+    <main class="layout">
+      <!-- 左: 入力と設定 -->
+      <section class="panel controls">
+        <div id="dropzone" class="dropzone">
+          <p>画像をここにドラッグ＆ドロップ</p>
+          <p class="sub">または</p>
+          <label class="btn">
+            ファイルを選択
+            <input id="fileInput" type="file" accept="image/*" hidden />
+          </label>
+        </div>
+
+        <fieldset>
+          <legend>出力サイズ</legend>
+          <div class="row">
+            <label>幅 <input id="outW" type="number" min="1" max="256" value="16" /></label>
+            <label>高さ <input id="outH" type="number" min="1" max="256" value="16" /></label>
+          </div>
+          <div class="row presets">
+            <button class="chip" data-w="16" data-h="16">16×16 タイル</button>
+            <button class="chip" data-w="16" data-h="28">16×28 キャラ</button>
+            <button class="chip" data-w="32" data-h="32">32×32</button>
+            <button class="chip" data-w="32" data-h="36">32×36 ボス</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>パレット</legend>
+          <select id="paletteSelect"></select>
+          <div id="swatches" class="swatches"></div>
+          <details>
+            <summary>自作パレットを読み込む（HEX / .gpl）</summary>
+            <textarea
+              id="customPalette"
+              rows="4"
+              placeholder="#1a1c2c&#10;#5d275d&#10;… または .gpl の中身を貼付"
+            ></textarea>
+            <button id="applyCustom" class="btn small">適用</button>
+            <span id="customStatus" class="status"></span>
+          </details>
+        </fieldset>
+
+        <fieldset>
+          <legend>ディザリング手法</legend>
+          <label><input type="radio" name="dither" value="none" /> なし（最近色のみ）</label>
+          <label><input type="radio" name="dither" value="ordered" checked /> 組織的（ベイヤー）</label>
+          <label><input type="radio" name="dither" value="fs" /> フロイド–スタインバーグ</label>
+
+          <div class="row" id="bayerRow">
+            <label>ベイヤー
+              <select id="bayerSize">
+                <option value="2">2×2</option>
+                <option value="4" selected>4×4</option>
+                <option value="8">8×8</option>
+              </select>
+            </label>
+          </div>
+          <div class="row" id="serpentineRow" hidden>
+            <label><input id="serpentine" type="checkbox" checked /> serpentine走査</label>
+          </div>
+          <div class="row">
+            <label>強度 <input id="strength" type="range" min="0" max="1" step="0.05" value="1" /></label>
+            <span id="strengthVal" class="status">1.00</span>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>詳細</legend>
+          <div class="row">
+            <label>縮小
+              <select id="downscale">
+                <option value="area" selected>面積平均（高品質）</option>
+                <option value="nearest">ニアレスト</option>
+              </select>
+            </label>
+            <label>色差
+              <select id="deltaMode">
+                <option value="76" selected>ΔE76（高速）</option>
+                <option value="2000">CIEDE2000（高精度）</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>書き出し</legend>
+          <div class="row">
+            <label>拡大
+              <select id="exportScale">
+                <option value="1">×1（原寸）</option>
+                <option value="4">×4</option>
+                <option value="8" selected>×8</option>
+                <option value="16">×16</option>
+              </select>
+            </label>
+            <button id="exportBtn" class="btn" disabled>PNGを保存</button>
+          </div>
+        </fieldset>
+      </section>
+
+      <!-- 右: プレビュー -->
+      <section class="panel preview">
+        <div class="preview-grid">
+          <figure>
+            <figcaption>入力</figcaption>
+            <div class="canvas-wrap"><canvas id="srcCanvas"></canvas></div>
+          </figure>
+          <figure>
+            <figcaption>出力（<span id="outLabel">16×16</span>・拡大表示）</figcaption>
+            <div class="canvas-wrap checker"><canvas id="outCanvas"></canvas></div>
+          </figure>
+        </div>
+        <p id="hint" class="hint">画像を読み込むとプレビューが表示されます。</p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
