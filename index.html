@@ -224,6 +224,16 @@
                   <label class="grid-toggle" title="ドットの境目にマス目を表示。位置合わせがしやすくなります"
                     ><input id="gridToggle" type="checkbox" /> マス目</label
                   >
+                  <div class="tool-group" title="背景を透明にします">
+                    <span class="tb-label">背景切り抜き</span>
+                    <button id="bgEdges" title="画像のフチから続く背景を透明にします（写真の一様な背景向け）">フチから</button>
+                    <button id="bgColor" title="いま選んでいる『描く色』に近い色をすべて透明にします">この色を</button>
+                    <select id="bgTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
+                      <option value="24">弱</option>
+                      <option value="48" selected>中</option>
+                      <option value="90">強</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div class="frame-bar" id="frameBar" title="アニメのコマ（フレーム）を複数持てます">
