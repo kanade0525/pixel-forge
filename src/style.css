@@ -36,15 +36,12 @@ body {
 
 /* アプリ全体を1枚のカードとしてビューポートに収める */
 .app-window {
-  margin: 16px auto;
-  max-width: 1180px;
-  height: calc(100vh - 32px);
+  margin: 0;
+  max-width: none;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
@@ -81,15 +78,23 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden; /* 横スクロールは出さない（広い要素は各枠内でスクロール） */
   padding: 20px 24px;
 }
 
 /* 2カラム */
 .app-grid {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 28px;
   align-items: start;
+}
+/* グリッド子が中身の最小幅で膨らんで横あふれするのを防ぐ */
+.controls,
+.preview,
+.preview-grid,
+figure {
+  min-width: 0;
 }
 @media (min-width: 821px) {
   .preview {
