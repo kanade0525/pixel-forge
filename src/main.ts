@@ -73,6 +73,7 @@ const exportScaleSel = $<HTMLSelectElement>('exportScale')
 const exportSizeLabel = $('exportSizeLabel')
 const exportBtn = $<HTMLButtonElement>('exportBtn')
 const srcCanvas = $<HTMLCanvasElement>('srcCanvas')
+const canvasWrap = $('canvasWrap')
 const outCanvas = $<HTMLCanvasElement>('outCanvas')
 const outLabel = $('outLabel')
 const emptyState = $('emptyState')
@@ -440,13 +441,20 @@ function updateExportSizeLabel(): void {
   infoExport.textContent = sourceImage ? label : '—'
 }
 
-// 表示ズーム。通常は最大300px、拡大編集モーダル中はビューポートに合わせて大きく。
+// 表示ズーム。通常は出力枠の幅いっぱいに、拡大編集モーダル中はビューポートに合わせて大きく。
 function editZoom(): number {
   if (!lastResult) return 1
-  const maxDim = isModal
-    ? Math.min(window.innerWidth * 0.6, window.innerHeight * 0.78)
-    : 320
-  return Math.max(1, Math.min(40, Math.floor(maxDim / Math.max(lastResult.width, lastResult.height))))
+  let maxW: number
+  let maxH: number
+  if (isModal) {
+    maxW = window.innerWidth * 0.9
+    maxH = window.innerHeight * 0.78
+  } else {
+    maxW = (canvasWrap.clientWidth || 360) - 20 // 出力枠の幅に追従
+    maxH = window.innerHeight * 0.6
+  }
+  const z = Math.floor(Math.min(maxW / lastResult.width, maxH / lastResult.height))
+  return Math.max(1, Math.min(40, z))
 }
 
 let currentZoom = 1
@@ -1086,6 +1094,16 @@ editModal.addEventListener('click', (e) => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isModal) closeModal()
+})
+// 画面サイズ変更で出力ズームを追従
+let resizeRaf = 0
+window.addEventListener('resize', () => {
+  if (resizeRaf) return
+  resizeRaf = requestAnimationFrame(() => {
+    resizeRaf = 0
+    if (lastResult) drawOutput()
+    if (tilemapPanel.open) drawMap()
+  })
 })
 
 // ============================================================

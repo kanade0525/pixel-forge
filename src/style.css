@@ -461,15 +461,21 @@ details summary {
 }
 
 /* プレビュー */
+/* 入力は参照用に細く、出力（編集）を主役として広く取る */
 .preview-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  grid-template-columns: minmax(180px, 320px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
 }
-@media (max-width: 560px) {
+@media (max-width: 720px) {
   .preview-grid {
     grid-template-columns: 1fr;
   }
+}
+/* 入力プレビューは大きくなりすぎないよう上限 */
+#srcCanvas {
+  max-width: 320px;
 }
 figure {
   margin: 0;
