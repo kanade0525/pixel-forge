@@ -56,7 +56,7 @@
               <span class="hint-inline">下の出力サイズで新規キャンバス</span>
             </div>
             <div class="field-row" id="bgSrcRow">
-              <span class="tb-label">背景切り抜き</span>
+              <span class="tb-label" title="縮小前の元画像から背景を消すので、輪郭がくっきり仕上がります（推奨）">背景切り抜き（元画像・推奨）</span>
               <button id="bgSrcCut" class="btn" type="button" disabled title="元画像のフチから続く背景を透明にしてから変換します（縮小後より輪郭がきれいになります）">
                 元画像から切り抜く
               </button>
@@ -213,8 +213,9 @@
               </figure>
               <figure id="outputFigure">
                 <figcaption>
-                  出力（<span id="outLabel">16×16</span>・クリック/ドラッグで手直しできます）
-                  <button id="openModal" class="link-btn" type="button" title="編集画面を大きく開きます（細かい作業向け）" disabled>拡大編集</button>
+                  出力（<span id="outLabel">16×16</span>・<span id="outHint">プレビュー</span>）
+                  <button id="toEdit" class="link-btn" type="button" title="この変換結果を「編集」タブで手直しします" hidden>✎ 編集タブで手直し</button>
+                  <button id="openModal" class="link-btn" type="button" title="編集画面を大きく開きます（細かい作業向け）" disabled hidden>全画面で編集</button>
                 </figcaption>
                 <div class="editor-toolbar" id="editorToolbar">
                   <div class="tool-group">
@@ -234,12 +235,15 @@
                     <button id="undoBtn" title="直前の操作を取り消す (Ctrl+Z)" disabled>元に戻す</button>
                     <button id="redoBtn" title="取り消した操作をやり直す (Ctrl+Y)" disabled>やり直し</button>
                   </div>
+                  <div class="tool-group">
+                    <button id="exportEdit" class="btn-default" title="いま編集中のコマをPNGで保存（拡大率は「変換」タブの書き出し設定を使用）" disabled>PNGを保存</button>
+                  </div>
                   <label class="grid-toggle" title="ドットの境目にマス目を表示。位置合わせがしやすくなります"
                     ><input id="gridToggle" type="checkbox" /> マス目</label
                   >
-                  <div class="tool-group" title="背景を透明にします">
-                    <span class="tb-label">背景切り抜き</span>
-                    <button id="bgEdges" title="画像のフチから続く背景を透明にします（写真の一様な背景向け）">フチから</button>
+                  <div class="tool-group" title="仕上げの背景消し。輪郭をきれいにしたいときは「変換」タブで元画像に対して行うのがおすすめです">
+                    <span class="tb-label">背景消し（仕上げ）</span>
+                    <button id="bgEdges" title="ドット絵のフチから続く背景を透明にします（仕上げの微調整用）">フチから</button>
                     <button id="bgColor" title="いま選んでいる『描く色』に近い色をすべて透明にします">この色を</button>
                     <select id="bgTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
                       <option value="24">弱</option>
@@ -323,7 +327,7 @@
               <div id="tilePicker" class="tile-picker" role="list" aria-label="タイル一覧"></div>
               <div class="canvas-wrap checker" id="mapWrap">
                 <canvas id="mapCanvas" aria-label="タイルマップ（クリック/ドラッグで配置）"></canvas>
-                <p id="mapEmpty" class="empty-state">先にコマ（タイル）を用意してください</p>
+                <p id="mapEmpty" class="empty-state">先にタイルを用意しましょう：「アニメ」タブで「コマを複製／空コマ追加」、または「変換」タブで1枚作るとタイルになります</p>
               </div>
             </section>
           </section>

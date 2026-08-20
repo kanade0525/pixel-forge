@@ -59,6 +59,9 @@ const bgSrcCut = $<HTMLButtonElement>('bgSrcCut')
 const bgSrcReset = $<HTMLButtonElement>('bgSrcReset')
 const bgSrcTol = $<HTMLSelectElement>('bgSrcTol')
 const openModalBtn = $<HTMLButtonElement>('openModal')
+const toEditBtn = $<HTMLButtonElement>('toEdit')
+const exportEditBtn = $<HTMLButtonElement>('exportEdit')
+const outHint = $('outHint')
 const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
 const modalSlot = $('modalSlot')
@@ -126,6 +129,7 @@ let frames: PixelImage[] = []
 let currentFrame = 0
 let isModal = false
 let sourceJustLoaded = false // 直前に新しい画像が読み込まれたか（frames を作り直す判定用）
+let edited = false // 現在のコマを手描き編集したか（単一コマでも再変換で上書きしない保護用）
 
 // --- タイルマップ ---
 let mapCols = 8
@@ -443,23 +447,28 @@ function render(): void {
 
   const result = quantizeImage(small, { ...opts, palette })
   // フレームへの反映ルール（手描き編集を壊さないため）:
-  //  - 新規画像 / フレーム無し / 出力サイズ変更 → フレーム一式を作り直す
-  //  - 単一フレーム → 置換（再変換で下地を更新。単一作業画像は上書き＝仕様）
-  //  - 複数フレーム（アニメ編集中）→ コマを上書きしない（設定変更で作画を失わない）
+  //  - 新規画像 / フレーム無し / 出力サイズ変更 → フレーム一式を作り直す（編集フラグもクリア）
+  //  - 単一フレームで未編集 → 置換（再変換で下地を更新）
+  //  - 単一フレームで編集済み / 複数フレーム → コマを上書きしない（設定変更で作画を失わない）
   const sizeChanged =
     frames.length > 0 && (frames[0].width !== result.width || frames[0].height !== result.height)
   if (sourceJustLoaded || frames.length === 0 || sizeChanged) {
     frames = [result]
     currentFrame = 0
     lastResult = frames[0]
+    edited = false
     resetHistory()
-  } else if (frames.length === 1) {
+  } else if (frames.length === 1 && !edited) {
     frames[0] = result
     currentFrame = 0
     lastResult = frames[0]
     resetHistory()
   } else {
-    showToast('コマが複数あるため、変換設定はコマに反映していません（新しい画像を読み込むと最初から作り直します）')
+    showToast(
+      frames.length > 1
+        ? 'コマが複数あるため、変換設定はコマに反映していません（新しい画像を読み込むと最初から作り直します）'
+        : '手直し済みのため、変換設定は反映していません（作り直すには画像を読み込み直してください）'
+    )
   }
   sourceJustLoaded = false
   const ms = performance.now() - t0
@@ -474,6 +483,7 @@ function render(): void {
   updateExportSizeLabel()
   // 初回レンダ完了＝lastResult 確定後に編集系を有効化
   exportBtn.disabled = false
+  exportEditBtn.disabled = false
   flipHBtn.disabled = false
   flipVBtn.disabled = false
 }
@@ -681,11 +691,14 @@ newBlankBtn.addEventListener('click', () => {
   resetHistory()
   drawOutput()
   exportBtn.disabled = false
+  exportEditBtn.disabled = false
   flipHBtn.disabled = false
   flipVBtn.disabled = false
   updateExportSizeLabel()
   updateFrameUI()
-  showToast(`白紙キャンバス ${w}×${h} を作成しました`)
+  edited = false
+  setMode('edit') // 白紙は「描き始める」操作 → 編集タブへ着地（ペン＋パレットが揃う）
+  showToast(`白紙キャンバス ${w}×${h} を作成しました。編集タブで描けます`)
 })
 
 const rerenderEls = [outW, outH, bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
@@ -748,6 +761,8 @@ applyCustom.addEventListener('click', () => {
 })
 
 exportBtn.addEventListener('click', exportPng)
+exportEditBtn.addEventListener('click', exportPng)
+toEditBtn.addEventListener('click', () => setMode('edit'))
 
 // ============================================================
 // レタッチ・エディタ（出力画像をピクセル単位で編集）
@@ -852,6 +867,7 @@ function bucketFill(sx: number, sy: number): boolean {
 // --- 履歴 ---
 function pushUndo(): void {
   if (!lastResult) return
+  edited = true // 手描き編集が入った → 単一コマでも再変換で上書きしない
   undoStack.push(lastResult.data.slice())
   // 大きいフレームは履歴段数を絞りメモリ肥大を防ぐ（512²超で少なめ）
   const cap = lastResult.width * lastResult.height > 512 * 512 ? 8 : MAX_HISTORY
@@ -884,8 +900,12 @@ function updateUndoRedo(): void {
 }
 
 // --- ポインタ操作 ---
+// 変換タブの出力は「プレビュー専用」。編集は「編集」/「アニメ」タブでのみ有効。
+function canPaint(): boolean {
+  return document.body.dataset.mode === 'edit' || document.body.dataset.mode === 'anim'
+}
 outCanvas.addEventListener('pointerdown', (e) => {
-  if (!lastResult) return
+  if (!lastResult || !canPaint()) return
   if (playing) stopPlay() // 編集を始めたら再生停止
   const p = eventToPixel(e)
   if (!p) return
@@ -912,7 +932,7 @@ outCanvas.addEventListener('pointerdown', (e) => {
   drawOutput()
 })
 outCanvas.addEventListener('pointermove', (e) => {
-  if (!painting || !lastResult) return
+  if (!painting || !lastResult || !canPaint()) return
   const p = eventToPixel(e)
   if (!p) return
   strokeLine(lastPx, lastPy, p.x, p.y)
@@ -965,6 +985,10 @@ const CURSORS: Record<Tool, { svg: string; hx: number; hy: number; fb: string }>
   },
 }
 function updateCanvasCursor(): void {
+  if (!canPaint()) {
+    outCanvas.style.cursor = 'default' // 変換タブ等はプレビュー専用
+    return
+  }
   const c = CURSORS[tool]
   outCanvas.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(c.svg)}") ${c.hx} ${c.hy}, ${c.fb}`
 }
@@ -1154,6 +1178,23 @@ function gotoFrame(i: number): void {
   drawOutput()
   updateFrameUI()
 }
+// 出力キャプションの導線・空状態文言・カーソルを現在のモードと状態から更新
+function updateOutputAffordances(): void {
+  const mode = document.body.dataset.mode ?? 'convert'
+  const has = !!lastResult
+  outHint.textContent = mode === 'convert' ? 'プレビュー' : 'クリック/ドラッグで手直し'
+  toEditBtn.hidden = !(mode === 'convert' && has) // 変換タブでのみ「編集へ」CTA
+  // 全画面編集ボタンは編集/アニメのみ。モーダル表示中は重複防止で隠す
+  openModalBtn.hidden = isModal || !((mode === 'edit' || mode === 'anim') && has)
+  emptyState.textContent =
+    mode === 'convert'
+      ? '左で画像を読み込むと、ここに変換結果が表示されます'
+      : mode === 'edit'
+        ? '「変換」タブで画像を読み込むか「白紙から作る」で始めましょう'
+        : '「画像を複数追加」で連番画像を取り込むか、「変換」タブで1枚作るとコマになります'
+  updateCanvasCursor() // 描ける/描けないでカーソルを切替
+}
+
 function updateFrameUI(): void {
   const n = frames.length
   frameLabel.textContent = n === 0 ? '—' : `${currentFrame + 1} / ${n}`
@@ -1174,7 +1215,9 @@ function updateFrameUI(): void {
   if (document.body.dataset.mode === 'tilemap') {
     renderTilePicker()
     drawMap()
+    mapExportBtn.disabled = !tileDims()
   }
+  updateOutputAffordances()
 }
 
 framePrev.addEventListener('click', () => gotoFrame(currentFrame - 1))
@@ -1274,6 +1317,7 @@ async function addImagesAsFrames(files: File[]): Promise<void> {
   drawOutput()
   updateFrameUI()
   exportBtn.disabled = false
+  exportEditBtn.disabled = false
   flipHBtn.disabled = false
   flipVBtn.disabled = false
   showToast(`${added}枚をコマとして追加（全${frames.length}コマ）`)
@@ -1540,6 +1584,8 @@ mapCanvas.addEventListener('contextmenu', (e) => {
 mapColsInput.addEventListener('input', resizeMap)
 mapRowsInput.addEventListener('input', resizeMap)
 mapClearBtn.addEventListener('click', () => {
+  const hasTiles = mapData.some((v) => v >= 0)
+  if (hasTiles && !window.confirm('マップを全部空にします。よろしいですか？')) return
   mapData.fill(-1)
   drawMap()
 })
@@ -1605,6 +1651,8 @@ function setMode(mode: Mode): void {
     t.classList.toggle('active', t.dataset.mode === mode)
   })
 
+  updateOutputAffordances() // 出力キャプションの導線・空状態文言・カーソル
+
   // モードに応じて描画を更新
   if (mode === 'anim') {
     renderFrameStrip()
@@ -1613,6 +1661,7 @@ function setMode(mode: Mode): void {
     if (selectedTile >= frames.length) selectedTile = frames.length ? 0 : -1
     renderTilePicker()
     drawMap()
+    mapExportBtn.disabled = !tileDims() // タイル未用意なら空マップを書き出せない
   } else if (lastResult) {
     requestAnimationFrame(() => drawOutput()) // レイアウト確定後に幅追従で再描画
   }
