@@ -29,10 +29,17 @@
         <span class="tagline-detail">写真・イラストをきれいなドット絵に変換して手直しできます</span>
       </div>
 
+      <nav class="app-tabs" id="appTabs" role="tablist">
+        <button class="tab active" data-mode="convert" title="画像を読み込んで（または白紙で）色・サイズを決め、ドット絵に変換します">1. 変換</button>
+        <button class="tab" data-mode="edit" title="ドット絵をペンなどで手直しします（大きく表示）">2. 編集</button>
+        <button class="tab" data-mode="anim" title="コマ（フレーム）を複数作り、パラパラアニメを作ります">3. アニメ</button>
+        <button class="tab" data-mode="tilemap" title="作ったコマをタイルとして並べ、マップを作ります">4. タイルマップ</button>
+      </nav>
+
       <div class="window-pane app-pane">
         <div class="app-grid">
-          <!-- 左: 設定 -->
-          <section class="controls">
+          <!-- 左: 変換の設定 -->
+          <section class="controls" id="convertControls">
             <h3 class="sec-title">1. 画像を読み込む / 白紙から作る</h3>
             <div id="dropzone" class="dropzone">
               <p>画像をドラッグ＆ドロップ</p>
@@ -185,8 +192,8 @@
           <!-- 右: プレビュー -->
           <section class="preview">
             <div class="preview-grid">
-              <figure>
-                <figcaption>入力</figcaption>
+              <figure id="inputFigure">
+                <figcaption>入力（元画像）</figcaption>
                 <div class="canvas-wrap checker">
                   <canvas id="srcCanvas" role="img" aria-label="入力画像"></canvas>
                 </div>
@@ -244,7 +251,7 @@
                   <button id="sheetExport" title="全コマを横1列に並べた1枚のPNGとして保存（ゲームのアニメ素材向け）" disabled>コマを並べて保存</button>
                 </div>
 
-                <div class="editor-palette">
+                <div class="editor-palette" id="editorPalette">
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>
                   <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
                 </div>
@@ -264,9 +271,8 @@
               <div><dt>処理時間</dt><dd id="infoTime">—</dd></div>
             </dl>
 
-            <hr class="separator" />
-            <details class="tilemap-panel" id="tilemapPanel">
-              <summary>タイルマップ（タイルを並べて地図・シーンを作る）</summary>
+            <section class="tilemap-panel" id="tilemapPanel">
+              <h3 class="sec-title">タイルマップ（タイルを並べて地図・シーンを作る）</h3>
               <p class="help">
                 描いた「コマ」をタイルとして格子に並べ、大きな絵（マップ）を作れます。下でタイルを選び、マップをクリック/ドラッグで配置。右クリックで消去。
                 ※コマ（フレーム）を増やすと、そのぶんタイルの種類が増えます。
@@ -285,7 +291,7 @@
                 <canvas id="mapCanvas" aria-label="タイルマップ（クリック/ドラッグで配置）"></canvas>
                 <p id="mapEmpty" class="empty-state">先にコマ（タイル）を用意してください</p>
               </div>
-            </details>
+            </section>
           </section>
         </div>
 

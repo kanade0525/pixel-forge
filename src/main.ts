@@ -36,6 +36,7 @@ const gridToggle = $<HTMLInputElement>('gridToggle')
 // フレーム / オニオン / モーダル
 const outputFigure = $('outputFigure')
 const previewGridEl = outputFigure.parentElement as HTMLElement
+const frameBar = $('frameBar')
 const framePrev = $<HTMLButtonElement>('framePrev')
 const frameNext = $<HTMLButtonElement>('frameNext')
 const frameLabel = $('frameLabel')
@@ -50,7 +51,13 @@ const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
 const modalSlot = $('modalSlot')
 // タイルマップ
-const tilemapPanel = $<HTMLDetailsElement>('tilemapPanel')
+const tilemapPanel = $('tilemapPanel')
+// モードタブ
+const appTabs = $('appTabs')
+const convertControls = $('convertControls')
+const inputFigure = $('inputFigure')
+const editorPalette = $('editorPalette')
+const infoCard = $('infoCard')
 const tilePicker = $('tilePicker')
 const mapCanvas = $<HTMLCanvasElement>('mapCanvas')
 const mapEmpty = $('mapEmpty')
@@ -1012,7 +1019,7 @@ function updateFrameUI(): void {
   // タイルマップのタイル一覧はコマ数に追従
   if (frames.length === 0) selectedTile = -1
   else if (selectedTile >= frames.length) selectedTile = 0
-  if (tilemapPanel.open) {
+  if (document.body.dataset.mode === 'tilemap') {
     renderTilePicker()
     drawMap()
   }
@@ -1102,7 +1109,7 @@ window.addEventListener('resize', () => {
   resizeRaf = requestAnimationFrame(() => {
     resizeRaf = 0
     if (lastResult) drawOutput()
-    if (tilemapPanel.open) drawMap()
+    if (document.body.dataset.mode === 'tilemap') drawMap()
   })
 })
 
@@ -1282,12 +1289,43 @@ mapExportBtn.addEventListener('click', () => {
     showToast(`${name} を保存しました`)
   }, 'image/png')
 })
-tilemapPanel.addEventListener('toggle', () => {
-  if (tilemapPanel.open) {
+// ============================================================
+// モード切替（タブ）: 変換 / 編集 / アニメ / タイルマップ
+// ============================================================
+type Mode = 'convert' | 'edit' | 'anim' | 'tilemap'
+function setMode(mode: Mode): void {
+  document.body.dataset.mode = mode
+  // 各モードで表示する要素（hidden 属性で切替）
+  const show = {
+    convert: { controls: 1, input: 1, tools: 0, palette: 0, frameBar: 0, tilemap: 0, output: 1, info: 1 },
+    edit: { controls: 0, input: 0, tools: 1, palette: 1, frameBar: 0, tilemap: 0, output: 1, info: 0 },
+    anim: { controls: 0, input: 0, tools: 1, palette: 1, frameBar: 1, tilemap: 0, output: 1, info: 1 },
+    tilemap: { controls: 0, input: 0, tools: 0, palette: 0, frameBar: 0, tilemap: 1, output: 0, info: 0 },
+  }[mode]
+  convertControls.hidden = !show.controls
+  inputFigure.hidden = !show.input
+  editorToolbar.hidden = !show.tools
+  editorPalette.hidden = !show.palette
+  frameBar.hidden = !show.frameBar
+  tilemapPanel.hidden = !show.tilemap
+  outputFigure.hidden = !show.output
+  infoCard.hidden = !show.info
+
+  appTabs.querySelectorAll<HTMLElement>('.tab').forEach((t) => {
+    t.classList.toggle('active', t.dataset.mode === mode)
+  })
+
+  // モードに応じて描画を更新
+  if (mode === 'tilemap') {
     if (selectedTile >= frames.length) selectedTile = frames.length ? 0 : -1
     renderTilePicker()
     drawMap()
+  } else if (lastResult) {
+    requestAnimationFrame(() => drawOutput()) // レイアウト確定後に幅追従で再描画
   }
+}
+appTabs.querySelectorAll<HTMLElement>('.tab').forEach((t) => {
+  t.addEventListener('click', () => setMode(t.dataset.mode as Mode))
 })
 
 // --- 初期表示 ---
@@ -1299,3 +1337,4 @@ updateCanvasCursor()
 updateUndoRedo()
 updateFrameUI()
 if (!isAdaptive()) renderPalette(activePalette())
+setMode('convert') // 初期は「変換」モード

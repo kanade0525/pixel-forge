@@ -82,12 +82,49 @@ body {
   padding: 20px 24px;
 }
 
-/* 2カラム */
+/* モードタブ */
+.app-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.app-tabs .tab {
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 18px;
+  font-size: 14px;
+  font-family: inherit;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+}
+.app-tabs .tab:hover {
+  color: var(--text);
+}
+.app-tabs .tab.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  margin-bottom: -1px;
+}
+
+/* レイアウト（モード別の列構成） */
 .app-grid {
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr); /* 既定=全幅（編集/アニメ/タイルマップ） */
   gap: 28px;
   align-items: start;
+}
+body[data-mode='convert'] .app-grid {
+  grid-template-columns: 340px minmax(0, 1fr); /* 変換=設定＋プレビュー */
+}
+/* 入力を出す変換モードだけ2カラム、他は出力を全幅に */
+body:not([data-mode='convert']) .preview-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 /* グリッド子が中身の最小幅で膨らんで横あふれするのを防ぐ */
 .controls,
