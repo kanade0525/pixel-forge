@@ -541,6 +541,55 @@ canvas[aria-busy='true'] {
   font-weight: 600;
 }
 
+/* タイルマップ */
+.tilemap-panel > summary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.tile-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.tile-thumb {
+  padding: 2px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+  line-height: 0;
+}
+.tile-thumb.active {
+  border-color: var(--accent);
+}
+.tile-thumb canvas {
+  image-rendering: pixelated;
+  display: block;
+  border-radius: 3px;
+}
+.tile-eraser {
+  min-width: 40px;
+  height: 44px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+#mapWrap {
+  max-height: 60vh;
+  overflow: auto;
+  justify-content: flex-start;
+  align-items: flex-start;
+}
+#mapCanvas {
+  image-rendering: pixelated;
+  cursor: crosshair;
+  max-width: none;
+}
+
 /* フッター */
 .app-footer {
   font-size: 12px;

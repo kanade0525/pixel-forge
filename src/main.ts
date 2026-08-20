@@ -49,6 +49,15 @@ const openModalBtn = $<HTMLButtonElement>('openModal')
 const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
 const modalSlot = $('modalSlot')
+// タイルマップ
+const tilemapPanel = $<HTMLDetailsElement>('tilemapPanel')
+const tilePicker = $('tilePicker')
+const mapCanvas = $<HTMLCanvasElement>('mapCanvas')
+const mapEmpty = $('mapEmpty')
+const mapColsInput = $<HTMLInputElement>('mapCols')
+const mapRowsInput = $<HTMLInputElement>('mapRows')
+const mapClearBtn = $<HTMLButtonElement>('mapClear')
+const mapExportBtn = $<HTMLButtonElement>('mapExport')
 const applyCustom = $<HTMLButtonElement>('applyCustom')
 const customStatus = $('customStatus')
 const ditherHelp = $('ditherHelp')
@@ -91,6 +100,13 @@ let frames: PixelImage[] = []
 let currentFrame = 0
 let isModal = false
 let sourceJustLoaded = false // 直前に新しい画像が読み込まれたか（frames を作り直す判定用）
+
+// --- タイルマップ ---
+let mapCols = 8
+let mapRows = 8
+let mapData = new Int16Array(mapCols * mapRows).fill(-1) // 各セル = タイル(frame)index、-1=空
+let selectedTile = 0 // 選択中タイル（frame index）、-1=消しゴム
+let mapPainting = false
 
 // --- レタッチ・エディタ状態 ---
 type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
@@ -985,6 +1001,13 @@ function updateFrameUI(): void {
   frameBlank.disabled = !has
   sheetExportBtn.disabled = !has
   openModalBtn.disabled = !has
+  // タイルマップのタイル一覧はコマ数に追従
+  if (frames.length === 0) selectedTile = -1
+  else if (selectedTile >= frames.length) selectedTile = 0
+  if (tilemapPanel.open) {
+    renderTilePicker()
+    drawMap()
+  }
 }
 
 framePrev.addEventListener('click', () => gotoFrame(currentFrame - 1))
@@ -1063,6 +1086,190 @@ editModal.addEventListener('click', (e) => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isModal) closeModal()
+})
+
+// ============================================================
+// タイルマップ（各コマをタイルとして格子に並べる）
+// ============================================================
+function tileDims(): { w: number; h: number } | null {
+  if (frames.length === 0) return null
+  return { w: frames[0].width, h: frames[0].height }
+}
+
+function renderTilePicker(): void {
+  tilePicker.innerHTML = ''
+  const eraser = document.createElement('button')
+  eraser.type = 'button'
+  eraser.className = 'tile-thumb tile-eraser' + (selectedTile < 0 ? ' active' : '')
+  eraser.title = '空（配置を消す）'
+  eraser.textContent = '空'
+  eraser.addEventListener('click', () => {
+    selectedTile = -1
+    renderTilePicker()
+  })
+  tilePicker.appendChild(eraser)
+  frames.forEach((f, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'tile-thumb' + (selectedTile === i ? ' active' : '')
+    btn.title = `タイル ${i + 1}`
+    const cv = imageToCanvas(f)
+    cv.style.width = '40px'
+    cv.style.height = `${Math.round((40 * f.height) / f.width)}px`
+    btn.appendChild(cv)
+    btn.addEventListener('click', () => {
+      selectedTile = i
+      renderTilePicker()
+    })
+    tilePicker.appendChild(btn)
+  })
+}
+
+function mapZoom(): number {
+  const dims = tileDims()
+  if (!dims) return 1
+  const maxDim = 640
+  return Math.max(1, Math.min(20, Math.floor(maxDim / Math.max(mapCols * dims.w, mapRows * dims.h))))
+}
+
+function drawMap(): void {
+  const dims = tileDims()
+  mapEmpty.hidden = !!dims
+  if (!dims) {
+    mapCanvas.width = 1
+    mapCanvas.height = 1
+    return
+  }
+  const z = mapZoom()
+  const cw = dims.w * z
+  const ch = dims.h * z
+  mapCanvas.width = mapCols * cw
+  mapCanvas.height = mapRows * ch
+  const ctx = mapCanvas.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height)
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const t = mapData[r * mapCols + c]
+      if (t >= 0 && t < frames.length) {
+        ctx.drawImage(imageToCanvas(frames[t]), c * cw, r * ch, cw, ch)
+      }
+    }
+  }
+  ctx.strokeStyle = 'rgba(128,128,128,0.35)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let c = 0; c <= mapCols; c++) {
+    const x = c * cw + 0.5
+    ctx.moveTo(x, 0)
+    ctx.lineTo(x, mapCanvas.height)
+  }
+  for (let r = 0; r <= mapRows; r++) {
+    const y = r * ch + 0.5
+    ctx.moveTo(0, y)
+    ctx.lineTo(mapCanvas.width, y)
+  }
+  ctx.stroke()
+}
+
+function resizeMap(): void {
+  const c = clampInt(mapColsInput.value, 1, 64, 8)
+  const r = clampInt(mapRowsInput.value, 1, 64, 8)
+  const next = new Int16Array(c * r).fill(-1)
+  for (let y = 0; y < Math.min(r, mapRows); y++) {
+    for (let x = 0; x < Math.min(c, mapCols); x++) {
+      next[y * c + x] = mapData[y * mapCols + x]
+    }
+  }
+  mapCols = c
+  mapRows = r
+  mapData = next
+  drawMap()
+}
+
+function mapCellFromEvent(e: PointerEvent): { c: number; r: number } | null {
+  const rect = mapCanvas.getBoundingClientRect()
+  const c = Math.floor(((e.clientX - rect.left) / rect.width) * mapCols)
+  const r = Math.floor(((e.clientY - rect.top) / rect.height) * mapRows)
+  if (c < 0 || r < 0 || c >= mapCols || r >= mapRows) return null
+  return { c, r }
+}
+function placeTile(c: number, r: number, tile: number): void {
+  mapData[r * mapCols + c] = tile
+  drawMap()
+}
+
+mapCanvas.addEventListener('pointerdown', (e) => {
+  if (!tileDims()) return
+  const cell = mapCellFromEvent(e)
+  if (!cell) return
+  e.preventDefault()
+  mapPainting = true
+  mapCanvas.setPointerCapture(e.pointerId)
+  placeTile(cell.c, cell.r, selectedTile)
+})
+mapCanvas.addEventListener('pointermove', (e) => {
+  if (!mapPainting) return
+  const cell = mapCellFromEvent(e)
+  if (cell) placeTile(cell.c, cell.r, selectedTile)
+})
+const endMap = () => {
+  mapPainting = false
+}
+mapCanvas.addEventListener('pointerup', endMap)
+mapCanvas.addEventListener('pointercancel', endMap)
+mapCanvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault()
+  const cell = mapCellFromEvent(e as unknown as PointerEvent)
+  if (cell) placeTile(cell.c, cell.r, -1)
+})
+mapColsInput.addEventListener('input', resizeMap)
+mapRowsInput.addEventListener('input', resizeMap)
+mapClearBtn.addEventListener('click', () => {
+  mapData.fill(-1)
+  drawMap()
+})
+mapExportBtn.addEventListener('click', () => {
+  const dims = tileDims()
+  if (!dims) {
+    showToast('先にコマ（タイル）を用意してください')
+    return
+  }
+  const scale = Number(exportScaleSel.value)
+  const cw = dims.w * scale
+  const ch = dims.h * scale
+  const out = document.createElement('canvas')
+  out.width = mapCols * cw
+  out.height = mapRows * ch
+  const ctx = out.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      const t = mapData[r * mapCols + c]
+      if (t >= 0 && t < frames.length) ctx.drawImage(imageToCanvas(frames[t]), c * cw, r * ch, cw, ch)
+    }
+  }
+  const name = `pixelforge_map_${mapCols}x${mapRows}_tile${dims.w}x${dims.h}_x${scale}.png`
+  out.toBlob((blob) => {
+    if (!blob) {
+      showToast('保存に失敗しました（サイズを小さくしてお試しください）')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    showToast(`${name} を保存しました`)
+  }, 'image/png')
+})
+tilemapPanel.addEventListener('toggle', () => {
+  if (tilemapPanel.open) {
+    if (selectedTile >= frames.length) selectedTile = frames.length ? 0 : -1
+    renderTilePicker()
+    drawMap()
+  }
 })
 
 // --- 初期表示 ---
