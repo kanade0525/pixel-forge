@@ -1,4 +1,4 @@
-import './style.css'
+// スタイルは index.html の <link> で読み込む（描画前にCSS適用しFOUCを防ぐ）
 import type { ConvertOptions, DitherMode, DownscaleMode, BayerSize, Palette, PixelImage } from './types'
 import { PALETTES, getPalette, hexToPaletteColor } from './palettes/palettes'
 import { parsePaletteText } from './palettes/parse'
@@ -49,6 +49,15 @@ const frameDel = $<HTMLButtonElement>('frameDel')
 const refMode = $<HTMLSelectElement>('refMode') // 透かし（下絵）: none/source/prev
 const onionOpacity = $<HTMLInputElement>('onionOpacity')
 const sheetExportBtn = $<HTMLButtonElement>('sheetExport')
+const frameStrip = $('frameStrip')
+const playBtn = $<HTMLButtonElement>('playBtn')
+const fpsInput = $<HTMLInputElement>('fpsInput')
+const addImagesBtn = $<HTMLButtonElement>('addImages')
+const addImagesInput = $<HTMLInputElement>('addImagesInput')
+// 元画像の背景切り抜き
+const bgSrcCut = $<HTMLButtonElement>('bgSrcCut')
+const bgSrcReset = $<HTMLButtonElement>('bgSrcReset')
+const bgSrcTol = $<HTMLSelectElement>('bgSrcTol')
 const openModalBtn = $<HTMLButtonElement>('openModal')
 const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
@@ -102,7 +111,13 @@ const HARD_MAX_AREA = HARD_MAX_MP * 1_000_000
 
 // --- 状態 ---
 let sourceImage: PixelImage | null = null
+let sourceOriginal: PixelImage | null = null // 背景切り抜き前の原本
+let sourceBgCut = false // 元画像の背景切り抜きを適用中か
 let customPal: Palette | null = null
+// アニメ再生
+let playTimer = 0
+let playSavedFrame = 0
+let playing = false
 let lastAdaptive: Palette | null = null
 let lastResult: PixelImage | null = null // = frames[currentFrame]（現在編集中のフレーム）
 
@@ -303,55 +318,76 @@ function clampInt(v: string, min: number, max: number, fallback: number): number
   return Math.max(min, Math.min(max, n))
 }
 
-// --- 画像読み込み ---
-async function loadFile(file: File): Promise<void> {
-  if (!file.type.startsWith('image/')) {
-    showToast('画像ファイルを選んでください。')
-    return
+// 画像ファイルを PixelImage にデコード（巨大画像は SAFE_DIM 以下へ縮小）。失敗時 null。
+async function decodeToPixelImage(
+  file: File
+): Promise<{ img: PixelImage; origW: number; origH: number } | null> {
+  if (!file.type.startsWith('image/')) return null
+  let bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const origW = bmp.width
+  const origH = bmp.height
+  if (origW * origH > HARD_MAX_AREA) {
+    bmp.close()
+    throw new Error('too-large')
   }
+  if (origW > SAFE_DIM || origH > SAFE_DIM) {
+    const scale = SAFE_DIM / Math.max(origW, origH)
+    const resized = await createImageBitmap(bmp, {
+      resizeWidth: Math.max(1, Math.round(origW * scale)),
+      resizeHeight: Math.max(1, Math.round(origH * scale)),
+      resizeQuality: 'high',
+    })
+    bmp.close()
+    bmp = resized
+  }
+  const cv = document.createElement('canvas')
+  cv.width = bmp.width
+  cv.height = bmp.height
+  const ctx = cv.getContext('2d')
+  if (!ctx) {
+    bmp.close()
+    throw new Error('no-ctx')
+  }
+  ctx.drawImage(bmp, 0, 0)
+  const id = ctx.getImageData(0, 0, bmp.width, bmp.height)
+  bmp.close()
+  return { img: { width: id.width, height: id.height, data: id.data }, origW, origH }
+}
+
+// --- 画像読み込み（単一。元画像として取り込み変換） ---
+async function loadFile(file: File): Promise<void> {
   try {
-    let bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    const origW = bmp.width
-    const origH = bmp.height
-    if (origW * origH > HARD_MAX_AREA) {
-      bmp.close()
-      showToast(`画像が大きすぎます（最大 ${HARD_MAX_MP}メガピクセル）。`)
+    const decoded = await decodeToPixelImage(file)
+    if (!decoded) {
+      showToast('画像ファイルを選んでください。')
       return
     }
-    // 長辺が SAFE_DIM を超える場合は取り込み時に縮小（iOS の canvas 面積上限による無音破綻を防ぐ）
-    if (origW > SAFE_DIM || origH > SAFE_DIM) {
-      const scale = SAFE_DIM / Math.max(origW, origH)
-      const rw = Math.max(1, Math.round(origW * scale))
-      const rh = Math.max(1, Math.round(origH * scale))
-      const resized = await createImageBitmap(bmp, {
-        resizeWidth: rw,
-        resizeHeight: rh,
-        resizeQuality: 'high',
-      })
-      bmp.close()
-      bmp = resized
-    }
-    const cv = document.createElement('canvas')
-    cv.width = bmp.width
-    cv.height = bmp.height
-    const ctx = cv.getContext('2d')
-    if (!ctx) throw new Error('canvas 2d コンテキストを取得できません')
-    ctx.drawImage(bmp, 0, 0)
-    const id = ctx.getImageData(0, 0, bmp.width, bmp.height)
-    const w = bmp.width
-    const h = bmp.height
-    bmp.close()
-    sourceImage = { width: id.width, height: id.height, data: id.data }
+    const { img, origW, origH } = decoded
+    sourceOriginal = { width: img.width, height: img.height, data: img.data.slice() } // 切り抜き前の原本
+    sourceImage = img
+    sourceBgCut = false // 新規画像は切り抜き前状態
     sourceJustLoaded = true // 新規画像 → フレームを作り直す
     infoSrc.textContent =
-      w !== origW || h !== origH ? `${origW}×${origH}px → ${w}×${h}px` : `${w}×${h}px`
+      img.width !== origW || img.height !== origH
+        ? `${origW}×${origH}px → ${img.width}×${img.height}px`
+        : `${img.width}×${img.height}px`
     emptyState.hidden = true
     document.body.classList.add('has-image')
+    bgSrcCut.disabled = false
+    bgSrcReset.disabled = false
+    // 既定の出力サイズは「元のサイズ」（読み込んだ画像の解像度そのまま）
+    outW.value = String(img.width)
+    outH.value = String(img.height)
+    updateExportSizeLabel()
     drawSource()
-    scheduleRender() // 初回レンダ完了時に保存ボタンを有効化する
+    scheduleRender()
   } catch (err) {
     console.error(err)
-    showToast('画像を読み込めませんでした（対応形式・破損をご確認ください）。')
+    showToast(
+      String((err as Error).message) === 'too-large'
+        ? `画像が大きすぎます（最大 ${HARD_MAX_MP}メガピクセル）。`
+        : '画像を読み込めませんでした（対応形式・破損をご確認ください）。'
+    )
   }
 }
 
@@ -477,8 +513,8 @@ function drawOutput(): void {
   const ctx = outCanvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, outCanvas.width, outCanvas.height)
-  // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。
-  const rm = refMode.value
+  // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。（再生中は出さない）
+  const rm = playing ? 'none' : refMode.value
   const alpha = Number(onionOpacity.value)
   if (rm === 'source' && sourceImage) {
     ctx.globalAlpha = alpha
@@ -612,6 +648,9 @@ newBlankBtn.addEventListener('click', () => {
   const w = clampInt(outW.value, 1, 2048, 16)
   const h = clampInt(outH.value, 1, 2048, 16)
   sourceImage = null // 元画像なし
+  sourceOriginal = null
+  bgSrcCut.disabled = true
+  bgSrcReset.disabled = true
   sourceJustLoaded = false
   frames = [blankFrame(w, h)]
   currentFrame = 0
@@ -847,6 +886,7 @@ function updateUndoRedo(): void {
 // --- ポインタ操作 ---
 outCanvas.addEventListener('pointerdown', (e) => {
   if (!lastResult) return
+  if (playing) stopPlay() // 編集を始めたら再生停止
   const p = eventToPixel(e)
   if (!p) return
   e.preventDefault()
@@ -1107,6 +1147,7 @@ function blankFrame(w: number, h: number): PixelImage {
   return { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) }
 }
 function gotoFrame(i: number): void {
+  stopPlay()
   currentFrame = Math.max(0, Math.min(frames.length - 1, i))
   lastResult = frames[currentFrame]
   resetHistory()
@@ -1124,6 +1165,9 @@ function updateFrameUI(): void {
   frameBlank.disabled = !has
   sheetExportBtn.disabled = !has
   openModalBtn.disabled = !has
+  playBtn.disabled = n < 2 // 再生は2コマ以上
+  // アニメのタイムライン（サムネ）
+  if (document.body.dataset.mode === 'anim') renderFrameStrip()
   // タイルマップのタイル一覧はコマ数に追従
   if (frames.length === 0) selectedTile = -1
   else if (selectedTile >= frames.length) selectedTile = 0
@@ -1155,6 +1199,143 @@ refMode.addEventListener('change', () => {
   drawOutput()
 })
 onionOpacity.addEventListener('input', drawOutput)
+
+// --- 元画像の背景切り抜き（変換前に適用＝輪郭がきれい） ---
+function applySourceBgCut(): void {
+  if (!sourceOriginal) return
+  sourceImage = {
+    width: sourceOriginal.width,
+    height: sourceOriginal.height,
+    data: sourceOriginal.data.slice(),
+  }
+  const removed = removeBackgroundEdges(sourceImage, Number(bgSrcTol.value))
+  sourceBgCut = true
+  sourceJustLoaded = true // 下地が変わったので作り直す
+  drawSource()
+  scheduleRender()
+  showToast(removed > 0 ? '元画像の背景を切り抜きました' : 'フチに切り抜ける背景が見つかりませんでした')
+}
+bgSrcCut.addEventListener('click', applySourceBgCut)
+bgSrcTol.addEventListener('change', () => {
+  if (sourceBgCut) applySourceBgCut() // 切り抜き済みなら強さ変更で再適用
+})
+bgSrcReset.addEventListener('click', () => {
+  if (!sourceOriginal) return
+  sourceImage = {
+    width: sourceOriginal.width,
+    height: sourceOriginal.height,
+    data: sourceOriginal.data.slice(),
+  }
+  sourceBgCut = false
+  sourceJustLoaded = true
+  drawSource()
+  scheduleRender()
+  showToast('元画像に戻しました')
+})
+
+// --- 複数画像をコマとして一括追加（アニメ素材） ---
+addImagesBtn.addEventListener('click', () => addImagesInput.click())
+addImagesInput.addEventListener('change', () => {
+  const files = addImagesInput.files
+  if (files && files.length) void addImagesAsFrames(Array.from(files))
+  addImagesInput.value = ''
+})
+async function addImagesAsFrames(files: File[]): Promise<void> {
+  const opts = readOptions()
+  const w = frames.length ? frames[0].width : opts.targetW
+  const h = frames.length ? frames[0].height : opts.targetH
+  let pal: Palette | null = isAdaptive() ? lastAdaptive : opts.palette
+  let added = 0
+  for (const file of files) {
+    let decoded: { img: PixelImage } | null = null
+    try {
+      decoded = await decodeToPixelImage(file)
+    } catch {
+      decoded = null
+    }
+    if (!decoded) continue
+    const small = downscale(decoded.img, w, h, opts.downscale)
+    if (isAdaptive() && !pal) {
+      pal = medianCutPalette(small, Number(adaptiveCount.value))
+      lastAdaptive = pal
+      renderPalette(pal)
+    }
+    frames.push(quantizeImage(small, { ...opts, palette: pal ?? opts.palette }))
+    added++
+  }
+  if (added === 0) {
+    showToast('追加できる画像がありませんでした')
+    return
+  }
+  currentFrame = frames.length - added // 最初に追加したコマへ
+  lastResult = frames[currentFrame]
+  document.body.classList.add('has-image')
+  resetHistory()
+  drawOutput()
+  updateFrameUI()
+  exportBtn.disabled = false
+  flipHBtn.disabled = false
+  flipVBtn.disabled = false
+  showToast(`${added}枚をコマとして追加（全${frames.length}コマ）`)
+}
+
+// --- アニメ再生 ---
+function stopPlay(): void {
+  if (!playing) return
+  clearInterval(playTimer)
+  playTimer = 0
+  playing = false
+  currentFrame = Math.min(playSavedFrame, frames.length - 1)
+  lastResult = frames[currentFrame]
+  playBtn.textContent = '▶ 再生'
+  drawOutput()
+  updateFrameUI()
+}
+function startPlay(): void {
+  if (frames.length < 2) return
+  playSavedFrame = currentFrame
+  playing = true
+  playBtn.textContent = '■ 停止'
+  const fps = Math.max(1, Math.min(30, Number(fpsInput.value) || 8))
+  let i = 0
+  playTimer = window.setInterval(() => {
+    currentFrame = i % frames.length
+    lastResult = frames[currentFrame]
+    drawOutput()
+    i++
+  }, 1000 / fps)
+}
+playBtn.addEventListener('click', () => (playing ? stopPlay() : startPlay()))
+fpsInput.addEventListener('change', () => {
+  if (playing) {
+    stopPlay()
+    startPlay()
+  }
+})
+
+// --- タイムライン（コマのサムネ一覧） ---
+function renderFrameStrip(): void {
+  frameStrip.innerHTML = ''
+  frames.forEach((f, i) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'frame-thumb' + (i === currentFrame ? ' active' : '')
+    btn.title = `コマ ${i + 1}`
+    const cv = imageToCanvas(f)
+    cv.style.width = '44px'
+    cv.style.height = `${Math.round((44 * f.height) / f.width)}px`
+    const num = document.createElement('span')
+    num.className = 'frame-thumb-num'
+    num.textContent = String(i + 1)
+    btn.appendChild(cv)
+    btn.appendChild(num)
+    btn.addEventListener('click', () => {
+      stopPlay()
+      gotoFrame(i)
+    })
+    frameStrip.appendChild(btn)
+  })
+}
 
 // スプライトシート書き出し（全フレームを横並び）
 sheetExportBtn.addEventListener('click', () => {
@@ -1402,6 +1583,7 @@ mapExportBtn.addEventListener('click', () => {
 // ============================================================
 type Mode = 'convert' | 'edit' | 'anim' | 'tilemap'
 function setMode(mode: Mode): void {
+  if (mode !== 'anim') stopPlay() // アニメ以外へ移ったら再生停止
   document.body.dataset.mode = mode
   // 各モードで表示する要素（hidden 属性で切替）
   const show = {
@@ -1424,6 +1606,9 @@ function setMode(mode: Mode): void {
   })
 
   // モードに応じて描画を更新
+  if (mode === 'anim') {
+    renderFrameStrip()
+  }
   if (mode === 'tilemap') {
     if (selectedTile >= frames.length) selectedTile = frames.length ? 0 : -1
     renderTilePicker()

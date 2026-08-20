@@ -15,6 +15,7 @@
       content="Lab色空間 ＋ ベイヤー / フロイド–スタインバーグで画像をドット絵化。ブラウザ内で完結。"
     />
     <meta property="og:type" content="website" />
+    <link rel="stylesheet" href="/src/style.css" />
     <title>Pixel Forge — 画像→ピクセルアート変換</title>
   </head>
   <body>
@@ -53,6 +54,18 @@
                 白紙から作る
               </button>
               <span class="hint-inline">下の出力サイズで新規キャンバス</span>
+            </div>
+            <div class="field-row" id="bgSrcRow">
+              <span class="tb-label">背景切り抜き</span>
+              <button id="bgSrcCut" class="btn" type="button" disabled title="元画像のフチから続く背景を透明にしてから変換します（縮小後より輪郭がきれいになります）">
+                元画像から切り抜く
+              </button>
+              <button id="bgSrcReset" class="btn" type="button" disabled title="切り抜きを取り消して元画像に戻します">戻す</button>
+              <select id="bgSrcTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
+                <option value="30">弱</option>
+                <option value="60" selected>中</option>
+                <option value="110">強</option>
+              </select>
             </div>
 
             <hr class="separator" />
@@ -258,8 +271,19 @@
                   <label class="grid-toggle" title="下絵の濃さ">濃さ
                     <input id="onionOpacity" type="range" min="0.1" max="0.85" step="0.05" value="0.4" disabled />
                   </label>
-                  <button id="sheetExport" title="全コマを横1列に並べた1枚のPNGとして保存（ゲームのアニメ素材向け）" disabled>コマを並べて保存</button>
+                  <div class="tool-group" title="コマを順に表示してアニメを確認">
+                    <button id="playBtn" disabled title="コマを順に再生してアニメを確認">▶ 再生</button>
+                    <label class="grid-toggle" title="1秒あたりのコマ数（速さ）">
+                      FPS <input id="fpsInput" type="number" min="1" max="30" value="8" style="width:56px" />
+                    </label>
+                  </div>
+                  <div class="tool-group">
+                    <button id="addImages" title="複数の画像をまとめてコマとして追加（アニメ素材の読み込み）">画像を複数追加</button>
+                    <input id="addImagesInput" type="file" accept="image/*" multiple hidden />
+                    <button id="sheetExport" title="全コマを横1列に並べた1枚のPNGとして保存（ゲームのアニメ素材向け）" disabled>コマを並べて保存</button>
+                  </div>
                 </div>
+                <div id="frameStrip" class="frame-strip" role="list" aria-label="コマ一覧（タイムライン）"></div>
 
                 <div class="editor-palette" id="editorPalette">
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>

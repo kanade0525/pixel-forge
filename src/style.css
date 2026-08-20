@@ -594,6 +594,42 @@ canvas[aria-busy='true'] {
   font-weight: 600;
 }
 
+/* アニメのタイムライン（コマ一覧） */
+.frame-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 12px;
+}
+.frame-thumb {
+  position: relative;
+  padding: 2px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  cursor: pointer;
+  line-height: 0;
+}
+.frame-thumb.active {
+  border-color: var(--accent);
+}
+.frame-thumb canvas {
+  image-rendering: pixelated;
+  display: block;
+  border-radius: 3px;
+}
+.frame-thumb-num {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  font-size: 10px;
+  line-height: 1;
+  padding: 1px 3px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border-radius: 3px;
+}
+
 /* タイルマップ */
 .tilemap-panel > summary {
   font-size: 13px;
