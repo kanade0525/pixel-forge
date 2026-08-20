@@ -33,13 +33,19 @@
         <div class="app-grid">
           <!-- 左: 設定 -->
           <section class="controls">
-            <h3 class="sec-title">1. 画像を読み込む</h3>
+            <h3 class="sec-title">1. 画像を読み込む / 白紙から作る</h3>
             <div id="dropzone" class="dropzone">
               <p>画像をドラッグ＆ドロップ</p>
               <label class="btn">
                 ファイルを選択
                 <input id="fileInput" type="file" accept="image/*" hidden />
               </label>
+            </div>
+            <div class="field-row">
+              <button id="newBlank" class="btn" type="button" title="画像を使わず、下の『出力サイズ』の大きさで白紙のキャンバスを作って一から描きます">
+                白紙から作る
+              </button>
+              <span class="hint-inline">下の出力サイズで新規キャンバス</span>
             </div>
 
             <hr class="separator" />

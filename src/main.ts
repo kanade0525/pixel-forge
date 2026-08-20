@@ -15,6 +15,7 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
 
 const dropzone = $('dropzone')
 const fileInput = $<HTMLInputElement>('fileInput')
+const newBlankBtn = $<HTMLButtonElement>('newBlank')
 const outW = $<HTMLInputElement>('outW')
 const outH = $<HTMLInputElement>('outH')
 const paletteSelect = $<HTMLSelectElement>('paletteSelect')
@@ -570,6 +571,48 @@ dropzone.addEventListener('drop', (e) => {
 })
 fileInput.addEventListener('change', () => {
   if (fileInput.files?.[0]) void loadFile(fileInput.files[0])
+})
+
+// 白紙から作る（画像を使わず一から描く）
+newBlankBtn.addEventListener('click', () => {
+  const w = clampInt(outW.value, 1, 2048, 16)
+  const h = clampInt(outH.value, 1, 2048, 16)
+  sourceImage = null // 元画像なし
+  sourceJustLoaded = false
+  frames = [blankFrame(w, h)]
+  currentFrame = 0
+  lastResult = frames[0]
+
+  // 入力プレビューは空に、情報を更新
+  srcCanvas.width = 1
+  srcCanvas.height = 1
+  srcCanvas.style.width = ''
+  srcCanvas.style.height = ''
+  infoSrc.textContent = '—'
+  infoOut.textContent = `${w}×${h}px`
+  infoTime.textContent = '—'
+  outLabel.textContent = `${w}×${h}`
+  emptyState.hidden = true
+  document.body.classList.add('has-image')
+
+  // 自動生成は元画像が要るので、白紙では固定パレットへ切替
+  if (isAdaptive()) {
+    paletteSelect.value = 'endesga32'
+    updatePaletteUI()
+  }
+  const pal = activePalette()
+  infoColors.textContent = `${pal.colors.length}色`
+  renderPalette(pal)
+  if (pal.colors.length) setPaintColor(pal.colors[0].r, pal.colors[0].g, pal.colors[0].b, 0)
+
+  resetHistory()
+  drawOutput()
+  exportBtn.disabled = false
+  flipHBtn.disabled = false
+  flipVBtn.disabled = false
+  updateExportSizeLabel()
+  updateFrameUI()
+  showToast(`白紙キャンバス ${w}×${h} を作成しました`)
 })
 
 const rerenderEls = [outW, outH, bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
