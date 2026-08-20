@@ -22,7 +22,12 @@ export function medianCutPalette(img: PixelImage, maxColors: number): Palette {
   const rs: number[] = []
   const gs: number[] = []
   const bs: number[] = []
-  for (let i = 0; i < d.length; i += 4) {
+  // 大きい画像は間引きサンプリングして計算量を抑える（代表色の抽出には十分）
+  const totalPx = d.length / 4
+  const SAMPLE_CAP = 65536
+  const stride = Math.max(1, Math.floor(totalPx / SAMPLE_CAP))
+  for (let p = 0; p < totalPx; p += stride) {
+    const i = p * 4
     if (d[i + 3] >= 8) {
       rs.push(d[i])
       gs.push(d[i + 1])

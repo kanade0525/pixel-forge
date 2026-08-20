@@ -26,7 +26,7 @@
       </div>
       <div class="details-bar">
         <span>画像 → ドット絵</span>
-        <span class="tagline-detail">Lab最近色 ＋ ベイヤー / フロイド–スタインバーグ</span>
+        <span class="tagline-detail">写真・イラストをきれいなドット絵に変換して手直しできます</span>
       </div>
 
       <div class="window-pane app-pane">
@@ -232,7 +232,9 @@
                       <option value="prev">前のコマ</option>
                     </select>
                   </label>
-                  <input id="onionOpacity" type="range" min="0.1" max="0.85" step="0.05" value="0.4" title="透かしの濃さ" />
+                  <label class="grid-toggle" title="下絵の濃さ">濃さ
+                    <input id="onionOpacity" type="range" min="0.1" max="0.85" step="0.05" value="0.4" disabled />
+                  </label>
                   <button id="sheetExport" title="全コマを横1列に並べた1枚のPNGとして保存（ゲームのアニメ素材向け）" disabled>コマを並べて保存</button>
                 </div>
 

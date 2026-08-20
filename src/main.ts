@@ -89,6 +89,7 @@ let lastResult: PixelImage | null = null // = frames[currentFrame]（現在編�
 let frames: PixelImage[] = []
 let currentFrame = 0
 let isModal = false
+let sourceJustLoaded = false // 直前に新しい画像が読み込まれたか（frames を作り直す判定用）
 
 // --- レタッチ・エディタ状態 ---
 type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
@@ -313,6 +314,7 @@ async function loadFile(file: File): Promise<void> {
     const h = bmp.height
     bmp.close()
     sourceImage = { width: id.width, height: id.height, data: id.data }
+    sourceJustLoaded = true // 新規画像 → フレームを作り直す
     infoSrc.textContent =
       w !== origW || h !== origH ? `${origW}×${origH}px → ${w}×${h}px` : `${w}×${h}px`
     emptyState.hidden = true
@@ -376,18 +378,29 @@ function render(): void {
   }
 
   const result = quantizeImage(small, { ...opts, palette })
-  // フレームに反映（サイズ変更時はフレーム一式をリセット、それ以外は現在フレームを置換）
-  if (frames.length === 0 || frames[0].width !== result.width || frames[0].height !== result.height) {
+  // フレームへの反映ルール（手描き編集を壊さないため）:
+  //  - 新規画像 / フレーム無し / 出力サイズ変更 → フレーム一式を作り直す
+  //  - 単一フレーム → 置換（再変換で下地を更新。単一作業画像は上書き＝仕様）
+  //  - 複数フレーム（アニメ編集中）→ コマを上書きしない（設定変更で作画を失わない）
+  const sizeChanged =
+    frames.length > 0 && (frames[0].width !== result.width || frames[0].height !== result.height)
+  if (sourceJustLoaded || frames.length === 0 || sizeChanged) {
     frames = [result]
     currentFrame = 0
+    lastResult = frames[0]
+    resetHistory()
+  } else if (frames.length === 1) {
+    frames[0] = result
+    currentFrame = 0
+    lastResult = frames[0]
+    resetHistory()
   } else {
-    frames[currentFrame] = result
+    showToast('コマが複数あるため、変換設定はコマに反映していません（新しい画像を読み込むと最初から作り直します）')
   }
-  lastResult = frames[currentFrame]
+  sourceJustLoaded = false
   const ms = performance.now() - t0
 
   outLabel.textContent = `${opts.targetW}×${opts.targetH}`
-  resetHistory() // 再変換で編集内容は破棄される
   drawOutput()
   updateFrameUI()
 
@@ -507,7 +520,10 @@ function exportPng(): void {
 
   const name = `pixelforge_${result.width}x${result.height}_x${scale}.png`
   out.toBlob((blob) => {
-    if (!blob) return
+    if (!blob) {
+      showToast('保存に失敗しました（拡大率を下げてお試しください）')
+      return
+    }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -635,6 +651,10 @@ function paintPixel(x: number, y: number): void {
   const i = (y * lastResult.width + x) * 4
   const d = lastResult.data
   if (tool === 'eraser') {
+    // 透明領域を均一化（RGBも0に）。塗りつぶし等の連結判定を安定させる。
+    d[i] = 0
+    d[i + 1] = 0
+    d[i + 2] = 0
     d[i + 3] = 0
   } else {
     d[i] = paint.r
@@ -672,13 +692,13 @@ function pickColor(x: number, y: number): void {
   if (!lastResult) return
   const i = (y * lastResult.width + x) * 4
   const d = lastResult.data
-  if (d[i + 3] === 0) return // 透明はスポイトしない
-  setPaintColor(d[i], d[i + 1], d[i + 2])
+  if (d[i + 3] !== 0) setPaintColor(d[i], d[i + 1], d[i + 2]) // 透明画素は色を取らない
   selectTool('pencil') // スポイト後はペンに戻す
 }
 
-function bucketFill(sx: number, sy: number): void {
-  if (!lastResult) return
+// 塗りつぶし。実際に変化があれば true。
+function bucketFill(sx: number, sy: number): boolean {
+  if (!lastResult) return false
   const w = lastResult.width
   const h = lastResult.height
   const d = lastResult.data
@@ -691,26 +711,35 @@ function bucketFill(sx: number, sy: number): void {
   const ng = tool === 'eraser' ? tg : paint.g
   const nb = tool === 'eraser' ? tb : paint.b
   const na = tool === 'eraser' ? 0 : 255
-  if (tr === nr && tg === ng && tb === nb && ta === na) return // 変化なし
+  if (tr === nr && tg === ng && tb === nb && ta === na) return false // 変化なし
+  // 開始画素が透明のときは RGB を無視し「透明どうし」を連結（消しゴム跡もまとめて塗れる）
+  const transparentFill = ta === 0
+  const match = (i: number) =>
+    transparentFill
+      ? d[i + 3] === 0
+      : d[i] === tr && d[i + 1] === tg && d[i + 2] === tb && d[i + 3] === ta
   const stack = [[sx, sy]]
   while (stack.length) {
     const [x, y] = stack.pop()!
     if (x < 0 || y < 0 || x >= w || y >= h) continue
     const i = (y * w + x) * 4
-    if (d[i] !== tr || d[i + 1] !== tg || d[i + 2] !== tb || d[i + 3] !== ta) continue
+    if (!match(i)) continue
     d[i] = nr
     d[i + 1] = ng
     d[i + 2] = nb
     d[i + 3] = na
     stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1])
   }
+  return true
 }
 
 // --- 履歴 ---
 function pushUndo(): void {
   if (!lastResult) return
   undoStack.push(lastResult.data.slice())
-  if (undoStack.length > MAX_HISTORY) undoStack.shift()
+  // 大きいフレームは履歴段数を絞りメモリ肥大を防ぐ（512²超で少なめ）
+  const cap = lastResult.width * lastResult.height > 512 * 512 ? 8 : MAX_HISTORY
+  while (undoStack.length > cap) undoStack.shift()
   redoStack.length = 0
   updateUndoRedo()
 }
@@ -750,8 +779,11 @@ outCanvas.addEventListener('pointerdown', (e) => {
   }
   if (tool === 'bucket') {
     pushUndo()
-    bucketFill(p.x, p.y)
-    drawOutput()
+    if (bucketFill(p.x, p.y)) drawOutput()
+    else {
+      undoStack.pop() // 変化なしなら履歴を積まない
+      updateUndoRedo()
+    }
     return
   }
   pushUndo()
@@ -901,7 +933,7 @@ function gotoFrame(i: number): void {
 }
 function updateFrameUI(): void {
   const n = frames.length
-  frameLabel.textContent = `${n === 0 ? 0 : currentFrame + 1} / ${n}`
+  frameLabel.textContent = n === 0 ? '—' : `${currentFrame + 1} / ${n}`
   const has = n > 0 && !!lastResult
   framePrev.disabled = currentFrame <= 0
   frameNext.disabled = currentFrame >= n - 1
@@ -929,7 +961,10 @@ frameDel.addEventListener('click', () => {
   frames.splice(currentFrame, 1)
   gotoFrame(Math.min(currentFrame, frames.length - 1))
 })
-refMode.addEventListener('change', drawOutput)
+refMode.addEventListener('change', () => {
+  onionOpacity.disabled = refMode.value === 'none' // 透かしなしのとき濃さは無効
+  drawOutput()
+})
 onionOpacity.addEventListener('input', drawOutput)
 
 // スプライトシート書き出し（全フレームを横並び）
@@ -948,7 +983,10 @@ sheetExportBtn.addEventListener('click', () => {
   })
   const name = `pixelforge_sheet_${frames.length}f_${w}x${h}_x${scale}.png`
   sheet.toBlob((blob) => {
-    if (!blob) return
+    if (!blob) {
+      showToast('保存に失敗しました（画像が大きすぎる可能性）')
+      return
+    }
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -961,14 +999,16 @@ sheetExportBtn.addEventListener('click', () => {
 
 // 拡大編集モーダル: 出力figureをモーダルへ移動して大きく編集
 function openModal(): void {
-  if (!lastResult) return
+  if (isModal || !lastResult) return
   modalSlot.appendChild(outputFigure)
+  openModalBtn.hidden = true // モーダル内では「拡大編集」リンクを隠す（重複防止）
   editModal.hidden = false
   isModal = true
   drawOutput()
 }
 function closeModal(): void {
   previewGridEl.appendChild(outputFigure) // 入力figureの後ろ（2番目）に戻る
+  openModalBtn.hidden = false
   editModal.hidden = true
   isModal = false
   drawOutput()
