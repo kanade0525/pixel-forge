@@ -293,6 +293,31 @@
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>
                   <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
                 </div>
+
+                <details class="ai-panel" id="aiPanel">
+                  <summary title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">✨ AIで下絵を作る（β・Gemini）</summary>
+                  <div class="ai-body">
+                    <textarea id="aiPrompt" rows="2" placeholder="例：剣を持ったドット絵の勇者、正面向き、背景は無地"></textarea>
+                    <div class="field-row">
+                      <label class="grid-toggle" title="いま表示中の絵を下絵にして描き変えます（例：右向き→正面、色替え）">
+                        <input id="aiUseImage" type="checkbox" /> 今の絵を下絵にする（img2img）
+                      </label>
+                    </div>
+                    <div class="field-row ai-result-mode">
+                      <span class="tb-label">結果の使い方</span>
+                      <label><input type="radio" name="aiResult" value="frame" checked /> コマとして追加</label>
+                      <label><input type="radio" name="aiResult" value="ref" /> 透かし下絵にする</label>
+                    </div>
+                    <div class="field-row">
+                      <button id="aiGenerate" class="btn btn-default" type="button">生成する</button>
+                      <span id="aiStatus" class="hint-inline"></span>
+                    </div>
+                    <p class="help ai-note">
+                      生成はサーバー経由で Google Gemini に送信されます（入力した文章・下絵が送られます）。
+                      商用利用の可否や生成物の権利は各サービスの規約・法令に従ってください。
+                    </p>
+                  </div>
+                </details>
                 <div class="canvas-wrap checker" id="canvasWrap">
                   <canvas id="outCanvas" aria-label="変換後のドット絵（クリック/ドラッグで編集）"></canvas>
                   <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>

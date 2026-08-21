@@ -62,6 +62,12 @@ const openModalBtn = $<HTMLButtonElement>('openModal')
 const toEditBtn = $<HTMLButtonElement>('toEdit')
 const exportEditBtn = $<HTMLButtonElement>('exportEdit')
 const outHint = $('outHint')
+// AI生成（Gemini・同一オリジンの /api/generate 経由）
+const aiPanel = $<HTMLDetailsElement>('aiPanel')
+const aiPrompt = $<HTMLTextAreaElement>('aiPrompt')
+const aiUseImage = $<HTMLInputElement>('aiUseImage')
+const aiGenerateBtn = $<HTMLButtonElement>('aiGenerate')
+const aiStatus = $('aiStatus')
 const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
 const modalSlot = $('modalSlot')
@@ -1411,6 +1417,131 @@ sheetExportBtn.addEventListener('click', () => {
   }, 'image/png')
 })
 
+// ============================================================
+// AI生成（Google Gemini・同一オリジンの /api/generate 経由）
+// 生成画像は既存の縮小＋量子化パイプラインでドット絵化してから取り込む。
+// ============================================================
+function pixelImageToBase64Png(img: PixelImage): { b64: string; mime: string } {
+  const url = imageToCanvas(img).toDataURL('image/png')
+  return { b64: url.split(',')[1] ?? '', mime: 'image/png' }
+}
+
+async function base64ToPixelImage(b64: string, mime: string): Promise<PixelImage> {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  const blob = new Blob([bytes], { type: mime })
+  let bmp = await createImageBitmap(blob)
+  if (bmp.width > SAFE_DIM || bmp.height > SAFE_DIM) {
+    const scale = SAFE_DIM / Math.max(bmp.width, bmp.height)
+    const r = await createImageBitmap(blob, {
+      resizeWidth: Math.max(1, Math.round(bmp.width * scale)),
+      resizeHeight: Math.max(1, Math.round(bmp.height * scale)),
+      resizeQuality: 'high',
+    })
+    bmp.close()
+    bmp = r
+  }
+  const cv = document.createElement('canvas')
+  cv.width = bmp.width
+  cv.height = bmp.height
+  const ctx = cv.getContext('2d')!
+  ctx.drawImage(bmp, 0, 0)
+  const id = ctx.getImageData(0, 0, bmp.width, bmp.height)
+  bmp.close()
+  return { width: id.width, height: id.height, data: id.data }
+}
+
+let aiBusy = false
+function aiSetBusy(busy: boolean, msg: string): void {
+  aiBusy = busy
+  aiGenerateBtn.disabled = busy
+  aiStatus.textContent = msg
+}
+
+async function aiGenerate(): Promise<void> {
+  if (aiBusy) return
+  const prompt = aiPrompt.value.trim()
+  if (!prompt) {
+    showToast('プロンプトを入力してください')
+    aiPrompt.focus()
+    return
+  }
+  const body: { prompt: string; image?: string; mimeType?: string } = { prompt }
+  if (aiUseImage.checked && lastResult) {
+    const { b64, mime } = pixelImageToBase64Png(lastResult)
+    body.image = b64
+    body.mimeType = mime
+  }
+  aiSetBusy(true, '生成中…（数秒〜十数秒）')
+  try {
+    const resp = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const j = (await resp.json().catch(() => ({}))) as { image?: string; mimeType?: string; error?: string }
+    if (!resp.ok || !j.image) {
+      aiSetBusy(false, '')
+      showToast('AI生成: ' + (j.error || `失敗しました (${resp.status})`))
+      return
+    }
+    const raw = await base64ToPixelImage(j.image, j.mimeType || 'image/png')
+    // 生成画像を現在の出力サイズへドット絵化
+    const opts = readOptions()
+    const w = frames.length ? frames[0].width : opts.targetW
+    const h = frames.length ? frames[0].height : opts.targetH
+    const small = downscale(raw, w, h, opts.downscale)
+    let pal = opts.palette
+    if (isAdaptive()) {
+      pal = medianCutPalette(small, Number(adaptiveCount.value))
+      lastAdaptive = pal
+      renderPalette(pal)
+    }
+    const dot = quantizeImage(small, { ...opts, palette: pal })
+    const mode =
+      (document.querySelector('input[name="aiResult"]:checked') as HTMLInputElement | null)?.value ?? 'frame'
+    if (mode === 'ref') {
+      // 透かし下絵に（なぞり描き用。高解像度の生画像を元画像として設定）
+      sourceImage = raw
+      sourceOriginal = { width: raw.width, height: raw.height, data: raw.data.slice() }
+      sourceBgCut = false
+      bgSrcCut.disabled = false
+      bgSrcReset.disabled = false
+      drawSource()
+      refMode.value = 'source'
+      onionOpacity.disabled = false
+      drawOutput()
+      showToast('AIで生成し、透かし下絵に設定しました')
+    } else {
+      // コマとして追加
+      if (frames.length === 0) {
+        frames = [dot]
+        currentFrame = 0
+      } else {
+        frames.splice(currentFrame + 1, 0, dot)
+        currentFrame += 1
+      }
+      lastResult = frames[currentFrame]
+      edited = true
+      document.body.classList.add('has-image')
+      resetHistory()
+      drawOutput()
+      updateFrameUI()
+      exportBtn.disabled = false
+      exportEditBtn.disabled = false
+      flipHBtn.disabled = false
+      flipVBtn.disabled = false
+      showToast('AIで生成し、コマを追加しました')
+    }
+    aiSetBusy(false, '')
+  } catch {
+    aiSetBusy(false, '')
+    showToast('AI生成に失敗しました（ネットワーク／サーバーのキー設定をご確認ください）')
+  }
+}
+aiGenerateBtn.addEventListener('click', () => void aiGenerate())
+
 // 拡大編集モーダル: 出力figureをモーダルへ移動して大きく編集
 function openModal(): void {
   if (isModal || !lastResult) return
@@ -1642,6 +1773,7 @@ function setMode(mode: Mode): void {
   inputFigure.hidden = !show.input
   editorToolbar.hidden = !show.tools
   editorPalette.hidden = !show.palette
+  aiPanel.hidden = !show.palette // AI生成は編集/アニメで表示（パレットと同条件）
   frameBar.hidden = !show.frameBar
   tilemapPanel.hidden = !show.tilemap
   outputFigure.hidden = !show.output
