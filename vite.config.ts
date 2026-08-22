@@ -31,6 +31,12 @@ function devApiPlugin(env: Record<string, string>): Plugin {
         if (req.method !== 'POST') return send({ error: 'POST のみ対応しています' }, 405)
         const key = env.GEMINI_API_KEY
         if (!key) return send({ error: '.env.local に GEMINI_API_KEY を設定してください' }, 500)
+        if (env.ACCESS_CODE) {
+          const provided = (req.headers['x-access-code'] as string | undefined) ?? ''
+          if (provided !== env.ACCESS_CODE) {
+            return send({ error: 'アクセスコードが必要です（または誤りです）', needCode: true }, 401)
+          }
+        }
         const chunks: Buffer[] = []
         for await (const c of req) chunks.push(c as Buffer)
         let body: GenerateRequest

@@ -1452,6 +1452,14 @@ async function base64ToPixelImage(b64: string, mime: string): Promise<PixelImage
   return { width: id.width, height: id.height, data: id.data }
 }
 
+// /api/generate 呼び出し（保存済みアクセスコードがあればヘッダに載せる）
+function callGenerate(body: { prompt: string; image?: string; mimeType?: string }): Promise<Response> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const code = localStorage.getItem('pf_access_code')
+  if (code) headers['x-access-code'] = code
+  return fetch('/api/generate', { method: 'POST', headers, body: JSON.stringify(body) })
+}
+
 let aiBusy = false
 function aiSetBusy(busy: boolean, msg: string): void {
   aiBusy = busy
@@ -1475,11 +1483,18 @@ async function aiGenerate(): Promise<void> {
   }
   aiSetBusy(true, '生成中…（数秒〜十数秒）')
   try {
-    const resp = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
+    let resp = await callGenerate(body)
+    // アクセスコードが必要なら一度だけ入力を求めて再試行
+    if (resp.status === 401) {
+      const e = (await resp.clone().json().catch(() => ({}))) as { needCode?: boolean }
+      if (e.needCode) {
+        const code = window.prompt('アクセスコードを入力してください（管理者から共有されたコード）')
+        if (code) {
+          localStorage.setItem('pf_access_code', code)
+          resp = await callGenerate(body)
+        }
+      }
+    }
     const j = (await resp.json().catch(() => ({}))) as { image?: string; mimeType?: string; error?: string }
     if (!resp.ok || !j.image) {
       aiSetBusy(false, '')

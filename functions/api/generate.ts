@@ -6,6 +6,7 @@ import { generateImage, type GenerateRequest } from '../../src/server/gemini'
 interface Env {
   GEMINI_API_KEY?: string
   GEMINI_IMAGE_MODEL?: string
+  ACCESS_CODE?: string // 設定すると、このコードを知る人だけが生成できる（実費の無制限利用を防止）
 }
 
 function json(obj: unknown, status: number): Response {
@@ -21,6 +22,13 @@ export async function onRequest(ctx: { request: Request; env: Env }): Promise<Re
   if (request.method !== 'POST') return json({ error: 'POST のみ対応しています' }, 405)
   if (!env.GEMINI_API_KEY) {
     return json({ error: 'サーバーにAPIキー(GEMINI_API_KEY)が設定されていません' }, 500)
+  }
+  // アクセスコードが設定されていれば照合（未設定なら誰でも可＝開発用途）
+  if (env.ACCESS_CODE) {
+    const provided = request.headers.get('x-access-code') ?? ''
+    if (provided !== env.ACCESS_CODE) {
+      return json({ error: 'アクセスコードが必要です（または誤りです）', needCode: true }, 401)
+    }
   }
   let body: GenerateRequest
   try {
