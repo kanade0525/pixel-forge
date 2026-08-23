@@ -604,6 +604,17 @@ function toImageData(img: PixelImage): ImageData {
 }
 
 // --- 書き出し ---
+// ブラウザ/端末の canvas 上限（iOS Safari は概ね 16.7Mpx=4096²）を超える書き出しを
+// 事前に弾き、silent な失敗（toBlob が null / 壊れたPNG）を防ぐ。超過時は理由を返す。
+const MAX_CANVAS_SIDE = 16384
+const MAX_CANVAS_AREA = 268_000_000 // ~16384² 弱。端末によってはさらに低い場合がある。
+function canvasSizeError(w: number, h: number): string | null {
+  if (w > MAX_CANVAS_SIDE || h > MAX_CANVAS_SIDE || w * h > MAX_CANVAS_AREA) {
+    return `書き出しサイズが大きすぎます（${w}×${h}px）。拡大率やコマ数を下げてください（端末によっては上限がさらに低い場合があります）。`
+  }
+  return null
+}
+
 function exportPng(): void {
   stopPlay() // 再生中はどのコマが保存されるか非決定的になるため止める
   // 保留中の描画があれば先に確定させ、ラベル表示とダウンロード内容の食い違いを防ぐ
@@ -623,6 +634,11 @@ function exportPng(): void {
     return
   }
   const scale = Number(exportScaleSel.value)
+  const sizeErr = canvasSizeError(result.width * scale, result.height * scale)
+  if (sizeErr) {
+    showToast(sizeErr)
+    return
+  }
   const small = imageToCanvas(result)
   const out = document.createElement('canvas')
   out.width = result.width * scale
@@ -1436,6 +1452,11 @@ sheetExportBtn.addEventListener('click', () => {
   const scale = Number(exportScaleSel.value)
   const w = frames[0].width
   const h = frames[0].height
+  const sheetErr = canvasSizeError(w * frames.length * scale, h * scale)
+  if (sheetErr) {
+    showToast(sheetErr)
+    return
+  }
   const sheet = document.createElement('canvas')
   sheet.width = w * frames.length * scale
   sheet.height = h * scale
@@ -1483,6 +1504,14 @@ zipExportBtn.addEventListener('click', () => {
   if (frames.length === 0) return
   stopPlay()
   const scale = Number(exportScaleSel.value)
+  // 最大サイズのコマで上限判定（1枚でも作れないなら中断）
+  const maxW = Math.max(...frames.map((f) => f.width)) * scale
+  const maxH = Math.max(...frames.map((f) => f.height)) * scale
+  const zipErr = canvasSizeError(maxW, maxH)
+  if (zipErr) {
+    showToast(zipErr)
+    return
+  }
   const pad = String(frames.length).length
   try {
     const entries = frames.map((f, i) => ({
@@ -1569,12 +1598,26 @@ function aiSetBusy(busy: boolean, msg: string): void {
   aiStatus.textContent = msg
 }
 
+function aiResultMode(): string {
+  return (
+    (document.querySelector('input[name="aiResult"]:checked') as HTMLInputElement | null)?.value ?? 'frame'
+  )
+}
+
 async function aiGenerate(): Promise<void> {
   if (aiBusy) return
   const prompt = aiPrompt.value.trim()
   if (!prompt) {
     showToast('プロンプトを入力してください')
     aiPrompt.focus()
+    return
+  }
+  // 「透かし下絵にする」は元画像を置き換える。読み込み済みの写真がある場合は課金前に確認。
+  if (
+    aiResultMode() === 'ref' &&
+    sourceOriginal &&
+    !window.confirm('生成結果を透かし下絵にすると、いま読み込んでいる元画像を置き換えます（背景切り抜き等の作業も失われます）。よろしいですか？')
+  ) {
     return
   }
   const body: { prompt: string; image?: string; mimeType?: string } = { prompt }
@@ -1616,8 +1659,7 @@ async function aiGenerate(): Promise<void> {
       renderPalette(pal)
     }
     const dot = quantizeImage(small, { ...opts, palette: pal })
-    const mode =
-      (document.querySelector('input[name="aiResult"]:checked') as HTMLInputElement | null)?.value ?? 'frame'
+    const mode = aiResultMode()
     if (mode === 'ref') {
       // 透かし下絵に（なぞり描き用。高解像度の生画像を元画像として設定）
       sourceImage = raw
@@ -1661,13 +1703,23 @@ async function aiGenerate(): Promise<void> {
 aiGenerateBtn.addEventListener('click', () => void aiGenerate())
 
 // 拡大編集モーダル: 出力figureをモーダルへ移動して大きく編集
+let lastFocusedBeforeModal: HTMLElement | null = null
+// モーダル内のフォーカス可能要素（無効・非表示を除く）
+function modalFocusables(): HTMLElement[] {
+  const sel = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  return Array.from(editModal.querySelectorAll<HTMLElement>(sel)).filter(
+    (el) => !el.hasAttribute('disabled') && el.offsetParent !== null
+  )
+}
 function openModal(): void {
   if (isModal || !lastResult) return
+  lastFocusedBeforeModal = document.activeElement as HTMLElement | null
   modalSlot.appendChild(outputFigure)
   openModalBtn.hidden = true // モーダル内では「拡大編集」リンクを隠す（重複防止）
   editModal.hidden = false
   isModal = true
   drawOutput()
+  closeModalBtn.focus() // 開いたらモーダル内へフォーカスを移す
 }
 function closeModal(): void {
   previewGridEl.appendChild(outputFigure) // 入力figureの後ろ（2番目）に戻る
@@ -1675,11 +1727,28 @@ function closeModal(): void {
   editModal.hidden = true
   isModal = false
   drawOutput()
+  lastFocusedBeforeModal?.focus?.() // 呼び出し元へフォーカスを戻す
 }
 openModalBtn.addEventListener('click', openModal)
 closeModalBtn.addEventListener('click', closeModal)
 editModal.addEventListener('click', (e) => {
   if (e.target === editModal) closeModal() // 背景クリックで閉じる
+})
+// フォーカストラップ: Tab がモーダル外へ抜けないように端で循環させる
+editModal.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || !isModal) return
+  const items = modalFocusables()
+  if (items.length === 0) return
+  const first = items[0]
+  const last = items[items.length - 1]
+  const active = document.activeElement as HTMLElement
+  if (e.shiftKey && active === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && active === last) {
+    e.preventDefault()
+    first.focus()
+  }
 })
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isModal) closeModal()
@@ -1869,6 +1938,11 @@ mapExportBtn.addEventListener('click', () => {
   const scale = Number(exportScaleSel.value)
   const cw = dims.w * scale
   const ch = dims.h * scale
+  const mapErr = canvasSizeError(mapCols * cw, mapRows * ch)
+  if (mapErr) {
+    showToast(mapErr)
+    return
+  }
   const out = document.createElement('canvas')
   out.width = mapCols * cw
   out.height = mapRows * ch
