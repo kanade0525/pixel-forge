@@ -21,9 +21,7 @@
   <body>
     <div class="window app-window">
       <div class="title-bar">
-        <button aria-hidden="true" class="hidden"></button>
         <h1 class="title">Pixel Forge</h1>
-        <button aria-hidden="true" class="hidden"></button>
       </div>
       <div class="details-bar">
         <span>画像 → ドット絵</span>
@@ -31,17 +29,17 @@
       </div>
 
       <nav class="app-tabs" id="appTabs" role="tablist">
-        <button class="tab active" data-mode="convert" title="画像を読み込んで（または白紙で）色・サイズを決め、ドット絵に変換します">1. 変換</button>
-        <button class="tab" data-mode="edit" title="ドット絵をペンなどで手直しします（大きく表示）">2. 編集</button>
-        <button class="tab" data-mode="anim" title="コマ（フレーム）を複数作り、パラパラアニメを作ります">3. アニメ</button>
-        <button class="tab" data-mode="tilemap" title="作ったコマをタイルとして並べ、マップを作ります">4. タイルマップ</button>
+        <button class="tab active" data-mode="convert" title="画像を読み込んで（または白紙で）色・サイズを決め、ドット絵に変換します">変換</button>
+        <button class="tab" data-mode="edit" title="ドット絵をペンなどで手直しします（大きく表示）">編集</button>
+        <button class="tab" data-mode="anim" title="コマ（フレーム）を複数作り、パラパラアニメを作ります">アニメ</button>
+        <button class="tab" data-mode="tilemap" title="作ったコマをタイルとして並べ、マップを作ります">タイルマップ</button>
       </nav>
 
       <div class="window-pane app-pane">
         <div class="app-grid">
           <!-- 左: 変換の設定 -->
           <section class="controls" id="convertControls">
-            <h3 class="sec-title">1. 画像を読み込む / 白紙から作る</h3>
+            <h3 class="sec-title">画像を読み込む / 白紙から作る</h3>
             <div id="dropzone" class="dropzone">
               <p>画像をドラッグ＆ドロップ</p>
               <label class="btn">
@@ -69,8 +67,8 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">2. 出力サイズ（ドットの粗さ）</h3>
-            <p class="help">何マス×何マスのドット絵にするか。小さいほど粗くレトロ、大きいほど細かくなります。タイルなら16、キャラなら32〜64が目安。</p>
+            <h3 class="sec-title">出力サイズ（ドットの粗さ）</h3>
+            <p class="help">小さいほど粗くレトロに。目安：タイル16・キャラ32〜64。</p>
             <div class="field-row">
               <label for="outW">幅</label>
               <input id="outW" type="number" min="1" max="2048" value="16" />
@@ -88,8 +86,8 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">3. パレット（使う色）</h3>
-            <p class="help">画像を「この色だけ」で描き直します。『画像から自動生成』はその写真に合う色を自動で選ぶので、まずはこれが無難です。</p>
+            <h3 class="sec-title">パレット（使う色）</h3>
+            <p class="help">この色だけで描き直します。迷ったら「画像から自動生成」。</p>
             <div class="field-row">
               <select
                 id="paletteSelect"
@@ -136,8 +134,8 @@
             </details>
 
             <hr class="separator" />
-            <h3 class="sec-title">4. 色の混ぜ方（ディザリング）</h3>
-            <p class="help">少ない色でグラデーションを表現する方法。ドットを細かく散らして中間色に「見せる」技術です。小さいドット絵では「なし」が基本。</p>
+            <h3 class="sec-title">色の混ぜ方（ディザリング）</h3>
+            <p class="help">少ない色で階調を表現。小さいドット絵は「なし」が基本。</p>
             <div class="field-row dither-row">
               <input type="radio" id="dither-none" name="dither" value="none" checked />
               <label for="dither-none" title="混ぜずに一番近い色へ置き換え。輪郭がくっきり。ドット絵はまずこれ。">なし（くっきり）</label>
@@ -168,7 +166,7 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">5. 詳細設定</h3>
+            <h3 class="sec-title">詳細設定</h3>
             <div class="field-row">
               <label for="downscale" title="画像を小さくする際の縮め方">縮め方</label>
               <select id="downscale">
@@ -185,8 +183,8 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">6. 書き出し（PNG保存）</h3>
-            <p class="help">ドットのまま拡大して保存できます。SNS等で見やすくするなら×8前後、素材として原寸で使うなら×1。</p>
+            <h3 class="sec-title">書き出し（PNG保存）</h3>
+            <p class="help">SNS表示は×8前後、素材の原寸は×1。</p>
             <div class="field-row">
               <label for="exportScale" title="保存するPNGを何倍に拡大するか。原寸(×1)はドット数そのまま。">拡大率</label>
               <select id="exportScale" title="ドットをくっきり保ったまま拡大保存します">
@@ -214,8 +212,8 @@
               <figure id="outputFigure">
                 <figcaption>
                   出力（<span id="outLabel">16×16</span>・<span id="outHint">プレビュー</span>）
-                  <button id="toEdit" class="link-btn" type="button" title="この変換結果を「編集」タブで手直しします" hidden>✎ 編集タブで手直し</button>
-                  <button id="openModal" class="link-btn" type="button" title="編集画面を大きく開きます（細かい作業向け）" disabled hidden>全画面で編集</button>
+                  <button id="toEdit" class="cap-btn" type="button" title="この変換結果を「編集」タブで手直しします" hidden>✎ 編集タブで手直し</button>
+                  <button id="openModal" class="cap-btn" type="button" title="編集画面を大きく開きます（細かい作業向け）" disabled hidden>全画面で編集</button>
                 </figcaption>
                 <div class="editor-stage" id="editorStage">
                   <!-- 左：アイコンのツール列（Aseprite/Piskel風） -->
@@ -257,8 +255,8 @@
                           <option value="4">4px</option>
                         </select>
                       </label>
-                      <button id="mirrorX" class="opt-toggle" title="左右対称に同時に描く">⇄ 左右対称</button>
-                      <button id="mirrorY" class="opt-toggle" title="上下対称に同時に描く">⇅ 上下対称</button>
+                      <button id="mirrorX" class="opt-toggle icon-toggle" title="左右対称に同時に描く" aria-label="左右対称">⇄</button>
+                      <button id="mirrorY" class="opt-toggle icon-toggle" title="上下対称に同時に描く" aria-label="上下対称">⇅</button>
                       <label class="opt" title="ドットの境目にマス目を表示"><input id="gridToggle" type="checkbox" /> マス目</label>
                       <span class="opt-spacer"></span>
                       <div class="tool-actions" aria-label="操作">
@@ -374,7 +372,6 @@
               <div><dt>出力サイズ</dt><dd id="infoOut">—</dd></div>
               <div><dt>パレット色数</dt><dd id="infoColors">—</dd></div>
               <div><dt>書き出し寸法</dt><dd id="infoExport">—</dd></div>
-              <div><dt>処理時間</dt><dd id="infoTime">—</dd></div>
             </dl>
 
             <section class="tilemap-panel" id="tilemapPanel">
@@ -428,8 +425,11 @@
 
     <!-- 拡大編集モーダル（出力figureをここへ移動して大きく編集） -->
     <div id="editModal" class="modal" hidden>
-      <div class="modal-inner">
-        <button id="closeModal" class="btn modal-close" type="button">✕ 閉じる</button>
+      <div class="modal-inner" role="dialog" aria-modal="true" aria-label="全画面で編集">
+        <div class="modal-head">
+          <span class="modal-title">全画面で編集</span>
+          <button id="closeModal" class="btn modal-close" type="button">✕ 閉じる</button>
+        </div>
         <div class="modal-slot" id="modalSlot"></div>
       </div>
     </div>

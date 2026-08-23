@@ -90,6 +90,11 @@ body {
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   flex: none;
+  overflow-x: auto; /* 狭い画面ではタブを横スクロール（折り返し崩れを防ぐ） */
+  scrollbar-width: none;
+}
+.app-tabs::-webkit-scrollbar {
+  display: none;
 }
 .app-tabs .tab {
   border: 1px solid var(--border);
@@ -101,6 +106,8 @@ body {
   font-family: inherit;
   border-radius: 8px 8px 0 0;
   cursor: pointer;
+  white-space: nowrap; /* タブ名は折り返さない */
+  flex: 0 0 auto;
 }
 .app-tabs .tab:hover {
   color: var(--text);
@@ -143,9 +150,7 @@ figure {
   .app-grid {
     grid-template-columns: 1fr;
   }
-  body.has-image .preview {
-    order: -1;
-  }
+  /* 変換モードのモバイルは「設定 → プレビュー」の自然順（設定が画面外に消えないように） */
   .details-bar .tagline-detail {
     display: none;
   }
@@ -157,9 +162,7 @@ figure {
 .sec-title {
   font-size: 13px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--muted);
+  color: var(--text);
   margin: 0 0 10px;
 }
 hr.separator {
@@ -430,6 +433,20 @@ details summary {
   color: var(--accent-contrast);
   border-color: var(--accent);
 }
+/* 破壊的操作は無害なボタンと見た目を分ける（赤系） */
+#clearCanvas,
+#frameDel,
+#mapClear {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+#clearCanvas:hover:not(:disabled),
+#frameDel:hover:not(:disabled),
+#mapClear:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
 .opt-spacer {
   flex: 1 1 auto;
   min-width: 8px;
@@ -578,6 +595,33 @@ details summary {
   color: var(--muted);
   cursor: not-allowed;
 }
+/* 見出し内の操作は青リンクではなく小さなボタンに（リンクと操作を混同させない） */
+.cap-btn {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 9px;
+  margin-left: 8px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.cap-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.cap-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* アイコン風トグル（対称描画など・正方形） */
+.icon-toggle {
+  min-width: 34px;
+  padding: 5px 8px;
+  font-size: 15px;
+  line-height: 1;
+}
 
 /* 拡大編集モーダル */
 .modal {
@@ -601,12 +645,21 @@ details summary {
   overflow: auto;
   position: relative;
 }
-.modal-close {
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
   position: sticky;
   top: 0;
-  float: right;
-  margin-bottom: 8px;
+  background: var(--surface);
   z-index: 1;
+}
+.modal-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
 }
 .modal-slot .canvas-wrap {
   max-height: 74vh;
