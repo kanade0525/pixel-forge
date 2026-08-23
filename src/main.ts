@@ -28,7 +28,8 @@ const addColorBtn = $<HTMLButtonElement>('addColor')
 const customPaletteText = $<HTMLTextAreaElement>('customPalette')
 // エディタ（レタッチ）
 const paintColorInput = $<HTMLInputElement>('paintColor')
-const editorToolbar = $('editorToolbar')
+const toolRail = $('toolRail')
+const toolOptions = $('toolOptions')
 const undoBtn = $<HTMLButtonElement>('undoBtn')
 const redoBtn = $<HTMLButtonElement>('redoBtn')
 const flipHBtn = $<HTMLButtonElement>('flipH')
@@ -1317,12 +1318,12 @@ outCanvas.addEventListener(
 // --- ツール選択 ---
 function selectTool(t: Tool): void {
   tool = t
-  editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((b) => {
+  toolRail.querySelectorAll<HTMLElement>('.tool').forEach((b) => {
     b.classList.toggle('active', b.dataset.tool === t)
   })
   updateCanvasCursor()
 }
-editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((btn) => {
+toolRail.querySelectorAll<HTMLElement>('.tool').forEach((btn) => {
   btn.addEventListener('click', () => selectTool(btn.dataset.tool as Tool))
 })
 // ツール別カーソル（SVGデータURI・ホットスポット付き）。pan/line/rect はCSSカーソルで扱う。
@@ -2404,7 +2405,8 @@ function setMode(mode: Mode): void {
   }[mode]
   convertControls.hidden = !show.controls
   inputFigure.hidden = !show.input
-  editorToolbar.hidden = !show.tools
+  toolRail.hidden = !show.tools
+  toolOptions.hidden = !show.tools
   editorPalette.hidden = !show.palette
   aiPanel.hidden = !show.palette // AI生成は編集/アニメで表示（パレットと同条件）
   zoomBar.hidden = !show.palette // ズーム操作バーも編集/アニメで表示
