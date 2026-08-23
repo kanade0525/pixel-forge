@@ -159,6 +159,8 @@ let lastPy = -1
 const undoStack: Uint8ClampedArray[] = []
 const redoStack: Uint8ClampedArray[] = []
 const MAX_HISTORY = 40
+// コマごとに undo/redo を退避（コマを行き来しても、そのコマの手描き取り消しが消えないように）
+const frameHistory = new WeakMap<PixelImage, { undo: Uint8ClampedArray[]; redo: Uint8ClampedArray[] }>()
 
 const DITHER_HELP: Record<DitherMode, string> = {
   none: 'いちばん近い色に置き換えます。輪郭くっきりで、小さいドット絵はこれが基本。',
@@ -325,6 +327,7 @@ function readOptions(): ConvertOptions {
 }
 
 function clampInt(v: string, min: number, max: number, fallback: number): number {
+  if (v.trim() === '') return fallback // 空欄は 0 ではなく既定値扱い（幅1pxへの無言丸めを防ぐ）
   const n = Math.round(Number(v))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
@@ -460,12 +463,32 @@ function render(): void {
   //  - 単一フレームで編集済み / 複数フレーム → コマを上書きしない（設定変更で作画を失わない）
   const sizeChanged =
     frames.length > 0 && (frames[0].width !== result.width || frames[0].height !== result.height)
-  if (sourceJustLoaded || frames.length === 0 || sizeChanged) {
+  if (sourceJustLoaded || frames.length === 0) {
     frames = [result]
     currentFrame = 0
     lastResult = frames[0]
     edited = false
     resetHistory()
+  } else if (sizeChanged) {
+    // サイズ変更は全コマの作り直し＝破壊的。コマ複数 or 手描き済みなら確認して守る。
+    if (
+      (frames.length > 1 || edited) &&
+      !window.confirm('出力サイズを変えると、今あるコマ／手直しをすべて作り直します。よろしいですか？')
+    ) {
+      // 取り消し: サイズ入力を現在のコマに戻して中断（silent なコマ消失を防止）
+      outW.value = String(frames[0].width)
+      outH.value = String(frames[0].height)
+      outLabel.textContent = `${frames[0].width}×${frames[0].height}`
+      updateExportSizeLabel()
+      sourceJustLoaded = false
+      return
+    }
+    frames = [result]
+    currentFrame = 0
+    lastResult = frames[0]
+    edited = false
+    resetHistory()
+    mapData.fill(-1) // タイルサイズが変わるとマップ配置は無効
   } else if (frames.length === 1 && !edited) {
     frames[0] = result
     currentFrame = 0
@@ -582,6 +605,7 @@ function toImageData(img: PixelImage): ImageData {
 
 // --- 書き出し ---
 function exportPng(): void {
+  stopPlay() // 再生中はどのコマが保存されるか非決定的になるため止める
   // 保留中の描画があれば先に確定させ、ラベル表示とダウンロード内容の食い違いを防ぐ
   if (rafId) {
     cancelAnimationFrame(rafId)
@@ -709,8 +733,10 @@ newBlankBtn.addEventListener('click', () => {
   showToast(`白紙キャンバス ${w}×${h} を作成しました。編集タブで描けます`)
 })
 
-const rerenderEls = [outW, outH, bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
+const rerenderEls = [bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
 rerenderEls.forEach((el) => el.addEventListener('input', onControlChange))
+// 出力サイズは確定時(change)のみ反映。keystroke毎に確認ダイアログが出る/途中値で潰れるのを防ぐ。
+;[outW, outH].forEach((el) => el.addEventListener('change', onControlChange))
 exportScaleSel.addEventListener('input', updateExportSizeLabel)
 document
   .querySelectorAll('input[name="dither"]')
@@ -1180,9 +1206,19 @@ function blankFrame(w: number, h: number): PixelImage {
 }
 function gotoFrame(i: number): void {
   stopPlay()
+  // 現在のコマの履歴を退避してから移動
+  if (lastResult) frameHistory.set(lastResult, { undo: undoStack.slice(), redo: redoStack.slice() })
   currentFrame = Math.max(0, Math.min(frames.length - 1, i))
   lastResult = frames[currentFrame]
-  resetHistory()
+  // 移動先コマの履歴を復元（無ければ空）
+  const h = frameHistory.get(lastResult)
+  undoStack.length = 0
+  redoStack.length = 0
+  if (h) {
+    undoStack.push(...h.undo)
+    redoStack.push(...h.redo)
+  }
+  updateUndoRedo()
   drawOutput()
   updateFrameUI()
 }
@@ -1234,15 +1270,18 @@ frameNext.addEventListener('click', () => gotoFrame(currentFrame + 1))
 frameDup.addEventListener('click', () => {
   if (!lastResult) return
   frames.splice(currentFrame + 1, 0, copyFrame(lastResult))
+  mapAdjustInsert(currentFrame + 1)
   gotoFrame(currentFrame + 1)
 })
 frameBlank.addEventListener('click', () => {
   if (!lastResult) return
   frames.splice(currentFrame + 1, 0, blankFrame(lastResult.width, lastResult.height))
+  mapAdjustInsert(currentFrame + 1)
   gotoFrame(currentFrame + 1)
 })
 frameDel.addEventListener('click', () => {
   if (frames.length <= 1) return
+  mapAdjustDelete(currentFrame)
   frames.splice(currentFrame, 1)
   gotoFrame(Math.min(currentFrame, frames.length - 1))
 })
@@ -1393,6 +1432,7 @@ function renderFrameStrip(): void {
 // スプライトシート書き出し（全フレームを横並び）
 sheetExportBtn.addEventListener('click', () => {
   if (frames.length === 0) return
+  stopPlay()
   const scale = Number(exportScaleSel.value)
   const w = frames[0].width
   const h = frames[0].height
@@ -1428,7 +1468,10 @@ function frameToPngBytes(f: PixelImage, scale: number): Uint8Array {
   const ctx = out.getContext('2d')!
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(imageToCanvas(f), 0, 0, out.width, out.height)
-  const b64 = out.toDataURL('image/png').split(',')[1] ?? ''
+  const url = out.toDataURL('image/png')
+  const b64 = url.split(',')[1] ?? ''
+  // 空/失敗(data:,)を無言で0バイトPNGとして格納しない。呼び出し側でまとめてエラー通知する。
+  if (!b64 || url === 'data:,') throw new Error('encode-failed')
   const bin = atob(b64)
   const bytes = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
@@ -1438,6 +1481,7 @@ function frameToPngBytes(f: PixelImage, scale: number): Uint8Array {
 // 全コマを個別PNGにして1つのZIPで保存（コマ単位でまとめてダウンロード）
 zipExportBtn.addEventListener('click', () => {
   if (frames.length === 0) return
+  stopPlay()
   const scale = Number(exportScaleSel.value)
   const pad = String(frames.length).length
   try {
@@ -1494,10 +1538,26 @@ async function base64ToPixelImage(b64: string, mime: string): Promise<PixelImage
   return { width: id.width, height: id.height, data: id.data }
 }
 
+// localStorage 例外安全ラッパ（Safariプライベート等で throw することがある）
+function lsGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+function lsSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* 保存不可の環境では黙って諦める（毎回入力にフォールバック） */
+  }
+}
+
 // /api/generate 呼び出し（保存済みアクセスコードがあればヘッダに載せる）
 function callGenerate(body: { prompt: string; image?: string; mimeType?: string }): Promise<Response> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const code = localStorage.getItem('pf_access_code')
+  const code = lsGet('pf_access_code')
   if (code) headers['x-access-code'] = code
   return fetch('/api/generate', { method: 'POST', headers, body: JSON.stringify(body) })
 }
@@ -1532,7 +1592,7 @@ async function aiGenerate(): Promise<void> {
       if (e.needCode) {
         const code = window.prompt('アクセスコードを入力してください（管理者から共有されたコード）')
         if (code) {
-          localStorage.setItem('pf_access_code', code)
+          lsSet('pf_access_code', code)
           resp = await callGenerate(body)
         }
       }
@@ -1577,6 +1637,7 @@ async function aiGenerate(): Promise<void> {
         currentFrame = 0
       } else {
         frames.splice(currentFrame + 1, 0, dot)
+        mapAdjustInsert(currentFrame + 1)
         currentFrame += 1
       }
       lastResult = frames[currentFrame]
@@ -1622,6 +1683,14 @@ editModal.addEventListener('click', (e) => {
 })
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && isModal) closeModal()
+})
+// 未保存の作業（手描き・複数コマ・タイル配置）があればリロード/離脱前に確認
+window.addEventListener('beforeunload', (e) => {
+  const hasWork = edited || frames.length > 1 || mapData.some((v) => v >= 0)
+  if (hasWork) {
+    e.preventDefault()
+    e.returnValue = ''
+  }
 })
 // 画面サイズ変更で出力ズームを追従
 let resizeRaf = 0
@@ -1744,6 +1813,16 @@ function placeTile(c: number, r: number, tile: number): void {
   mapData[r * mapCols + c] = tile
   drawMap()
 }
+// コマの挿入/削除に合わせて mapData（フレームindex参照）を補正し、配置の化け/消失を防ぐ。
+function mapAdjustInsert(at: number): void {
+  for (let i = 0; i < mapData.length; i++) if (mapData[i] >= at) mapData[i] += 1
+}
+function mapAdjustDelete(at: number): void {
+  for (let i = 0; i < mapData.length; i++) {
+    if (mapData[i] === at) mapData[i] = -1
+    else if (mapData[i] > at) mapData[i] -= 1
+  }
+}
 
 mapCanvas.addEventListener('pointerdown', (e) => {
   if (!tileDims()) return
@@ -1781,6 +1860,10 @@ mapExportBtn.addEventListener('click', () => {
   const dims = tileDims()
   if (!dims) {
     showToast('先にコマ（タイル）を用意してください')
+    return
+  }
+  if (!mapData.some((v) => v >= 0)) {
+    showToast('タイルが1つも配置されていません')
     return
   }
   const scale = Number(exportScaleSel.value)
