@@ -338,19 +338,74 @@ details summary {
   margin-top: 6px;
 }
 
-/* エディタ ツールバー */
-.editor-toolbar {
+/* エディタ（Aseprite/Piskel風: 左アイコン列＋上オプション＋操作分離） */
+.editor-stage {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
+  gap: 10px;
+  align-items: stretch;
   margin-bottom: 8px;
 }
 .tool-group {
   display: inline-flex;
   gap: 4px;
 }
-.editor-toolbar button {
+/* 左：アイコンのツール列 */
+.tool-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.tool-rail .tool {
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.tool-rail .tool svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+.tool-rail .tool:hover {
+  background: var(--surface-2);
+}
+.tool-rail .tool.active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+/* 右：オプション＋キャンバス＋表示バー */
+.stage-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.tool-options .opt {
+  font-size: 13px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tool-options button,
+.tool-actions button,
+.bg-remove button {
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
@@ -360,28 +415,47 @@ details summary {
   font-family: inherit;
   cursor: pointer;
 }
-.editor-toolbar button:hover {
+.tool-options button:hover,
+.tool-actions button:hover,
+.bg-remove button:hover {
   background: var(--surface-2);
 }
-.editor-toolbar button:disabled {
+.tool-options button:disabled,
+.tool-actions button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
-.editor-toolbar .tool.active {
+.opt-toggle.active {
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
 }
-.editor-toolbar #exportEdit {
+.opt-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.tool-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.tool-actions #undoBtn,
+.tool-actions #redoBtn {
+  font-size: 16px;
+  line-height: 1;
+  min-width: 34px;
+}
+.tool-actions #exportEdit {
   background: var(--accent);
   color: var(--accent-contrast);
   border-color: var(--accent);
 }
-.editor-toolbar #exportEdit:hover:not(:disabled) {
+.tool-actions #exportEdit:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }
-.editor-toolbar #exportEdit:disabled {
+.tool-actions #exportEdit:disabled {
   background: var(--surface);
   color: var(--text);
 }
@@ -667,21 +741,29 @@ canvas[aria-busy='true'] {
   color: var(--muted);
   min-width: 96px;
 }
-.editor-toolbar #mirrorX.active,
-.editor-toolbar #mirrorY.active {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-}
 @media (max-width: 720px) {
   #canvasWrap {
     height: 54vh;
   }
-  .editor-toolbar {
+  /* スマホ: ツール列は上部の横並びアイコンに */
+  .editor-stage {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tool-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .tool-rail .tool {
+    width: 40px;
+    height: 40px;
+  }
+  .tool-options {
     gap: 4px 6px;
   }
-  .editor-toolbar button,
-  .editor-toolbar select {
+  .tool-options button,
+  .tool-options select,
+  .tool-actions button {
     padding: 6px 8px;
     font-size: 12px;
   }
