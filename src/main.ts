@@ -124,7 +124,6 @@ const infoSrc = $('infoSrc')
 const infoOut = $('infoOut')
 const infoColors = $('infoColors')
 const infoExport = $('infoExport')
-const infoTime = $('infoTime')
 
 // iOS Safari 等の canvas 面積上限（概ね 4096²=16.7Mpx）を避けるため、長辺をこの値以下へ縮小して取り込む。
 // ドット絵化は最終的に 16〜256px へ縮小するため、2048 で十分な品質。
@@ -492,7 +491,6 @@ function scheduleRender(): void {
 function render(): void {
   if (!sourceImage) return
   const opts = readOptions()
-  const t0 = performance.now()
   const small = downscale(sourceImage, opts.targetW, opts.targetH, opts.downscale)
 
   // 自動生成パレットは縮小後の画像から作る（画像内の代表色にフィット）
@@ -558,7 +556,6 @@ function render(): void {
     )
   }
   sourceJustLoaded = false
-  const ms = performance.now() - t0
 
   outLabel.textContent = `${opts.targetW}×${opts.targetH}`
   drawOutput()
@@ -566,7 +563,6 @@ function render(): void {
 
   infoOut.textContent = `${opts.targetW}×${opts.targetH}px`
   infoColors.textContent = `${palette.colors.length}色`
-  infoTime.textContent = `${ms.toFixed(1)}ms`
   updateExportSizeLabel()
   // 初回レンダ完了＝lastResult 確定後に編集系を有効化
   exportBtn.disabled = false
@@ -836,7 +832,6 @@ newBlankBtn.addEventListener('click', () => {
   srcCanvas.style.height = ''
   infoSrc.textContent = '—'
   infoOut.textContent = `${w}×${h}px`
-  infoTime.textContent = '—'
   outLabel.textContent = `${w}×${h}`
   emptyState.hidden = true
   document.body.classList.add('has-image')
@@ -2418,6 +2413,9 @@ function setMode(mode: Mode): void {
   appTabs.querySelectorAll<HTMLElement>('.tab').forEach((t) => {
     t.classList.toggle('active', t.dataset.mode === mode)
   })
+
+  // モード切替時はスクロールを最上部へ（前モードの位置が残り、主要操作が見切れるのを防ぐ）
+  document.querySelector<HTMLElement>('.window-pane')?.scrollTo({ top: 0 })
 
   updateOutputAffordances() // 出力キャプションの導線・空状態文言・カーソル
 
