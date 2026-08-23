@@ -1,0 +1,17 @@
+# CodeRabbit 設定（PRの自動レビュー）。レビューは日本語で行う。
+language: ja-JP
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - '!dist/**'
+    - '!**/*.png'
+    - '!**/*.gif'
+chat:
+  auto_reply: true
