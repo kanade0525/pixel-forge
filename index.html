@@ -219,14 +219,30 @@
                 </figcaption>
                 <div class="editor-toolbar" id="editorToolbar">
                   <div class="tool-group">
-                    <button class="tool active" data-tool="pencil" title="選んだ色で点を描きます">ペン</button>
-                    <button class="tool" data-tool="eraser" title="なぞった部分を透明に消します">消しゴム</button>
-                    <button class="tool" data-tool="bucket" title="つながった同じ色を一気に塗り替えます">塗りつぶし</button>
-                    <button class="tool" data-tool="eyedropper" title="画像内の色をクリックして『描く色』に取り込みます">スポイト</button>
+                    <button class="tool active" data-tool="pencil" title="選んだ色で点を描きます (B)">ペン</button>
+                    <button class="tool" data-tool="eraser" title="なぞった部分を透明に消します (E)">消しゴム</button>
+                    <button class="tool" data-tool="bucket" title="つながった同じ色を一気に塗り替えます (G)">塗りつぶし</button>
+                    <button class="tool" data-tool="eyedropper" title="画像内の色をクリックして『描く色』に取り込みます (I)">スポイト</button>
+                    <button class="tool" data-tool="line" title="直線を引く：ドラッグで始点→終点 (L)">直線</button>
+                    <button class="tool" data-tool="rect" title="四角の枠を描く：ドラッグ (R)">四角</button>
+                    <button class="tool" data-tool="pan" title="表示を動かす：ドラッグ（スペース＋ドラッグ／2本指でも可） (H)">手のひら</button>
                   </div>
                   <label class="paint-color" title="ペンや塗りつぶしで使う色">
                     描く色 <input id="paintColor" type="color" value="#000000" />
                   </label>
+                  <label class="grid-toggle" title="ペン・直線・四角の太さ（[ ] キーでも増減）">太さ
+                    <select id="brushSize">
+                      <option value="1" selected>1px</option>
+                      <option value="2">2px</option>
+                      <option value="3">3px</option>
+                      <option value="4">4px</option>
+                    </select>
+                  </label>
+                  <div class="tool-group" title="対称に同時描画（左右対称キャラ等に便利）">
+                    <button id="mirrorX" title="左右対称に同時に描く">左右対称</button>
+                    <button id="mirrorY" title="上下対称に同時に描く">上下対称</button>
+                  </div>
+                  <button id="clearCanvas" title="キャンバスを全部消して透明にします">全消去</button>
                   <div class="tool-group">
                     <button id="flipH" title="絵を左右に反転（向き違いのスプライト作成に）" disabled>左右反転</button>
                     <button id="flipV" title="絵を上下に反転" disabled>上下反転</button>
@@ -293,6 +309,17 @@
                 <div class="editor-palette" id="editorPalette">
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>
                   <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
+                  <span class="editor-palette-label">最近使った色</span>
+                  <div id="recentSwatches" class="swatches" role="list" aria-label="最近使った色"></div>
+                </div>
+
+                <div class="zoom-bar" id="zoomBar">
+                  <span class="tb-label">表示</span>
+                  <button id="zoomOut" title="縮小 ( - )">－</button>
+                  <button id="zoomFit" title="全体を表示 ( 0 )">フィット</button>
+                  <button id="zoomIn" title="拡大 ( + )">＋</button>
+                  <span id="editHud" class="edit-hud" aria-live="polite"></span>
+                  <span class="hint-inline">ホイール/ピンチで拡大・スペース＋ドラッグで移動</span>
                 </div>
 
                 <details class="ai-panel" id="aiPanel">

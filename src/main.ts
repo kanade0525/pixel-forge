@@ -70,6 +70,17 @@ const aiPrompt = $<HTMLTextAreaElement>('aiPrompt')
 const aiUseImage = $<HTMLInputElement>('aiUseImage')
 const aiGenerateBtn = $<HTMLButtonElement>('aiGenerate')
 const aiStatus = $('aiStatus')
+// エディタ強化（ブラシ/ミラー/全消去/ズーム/HUD/最近色）
+const brushSizeSel = $<HTMLSelectElement>('brushSize')
+const mirrorXBtn = $<HTMLButtonElement>('mirrorX')
+const mirrorYBtn = $<HTMLButtonElement>('mirrorY')
+const clearCanvasBtn = $<HTMLButtonElement>('clearCanvas')
+const zoomInBtn = $<HTMLButtonElement>('zoomIn')
+const zoomOutBtn = $<HTMLButtonElement>('zoomOut')
+const zoomFitBtn = $<HTMLButtonElement>('zoomFit')
+const zoomBar = $('zoomBar')
+const editHud = $('editHud')
+const recentSwatches = $('recentSwatches')
 const closeModalBtn = $<HTMLButtonElement>('closeModal')
 const editModal = $('editModal')
 const modalSlot = $('modalSlot')
@@ -147,7 +158,7 @@ let selectedTile = 0 // 選択中タイル（frame index）、-1=消しゴム
 let mapPainting = false
 
 // --- レタッチ・エディタ状態 ---
-type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
+type Tool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper' | 'line' | 'rect' | 'pan'
 let tool: Tool = 'pencil'
 let paint = { r: 0, g: 0, b: 0 } // 描く色
 let selectedSwatch = -1 // 選択中スウォッチの index（同色重複でも1つだけ強調）
@@ -156,6 +167,25 @@ let painting = false
 let paintInitialized = false
 let lastPx = -1
 let lastPy = -1
+let brush = 1 // ペン/消し/直線/矩形の太さ（px）
+let mirrorX = false // 左右対称描画
+let mirrorY = false // 上下対称描画
+const recentColors: { r: number; g: number; b: number }[] = [] // 最近使った色（先頭が新しい）
+// ビュー（ズーム/パン）: viewZoom<=0 は「フィット（自動）」、>0 はユーザー指定倍率
+let viewZoom = 0
+let panX = 0
+let panY = 0
+// 直線/矩形のドラッグ中プレビュー
+let pendingShape: { sx: number; sy: number; ex: number; ey: number } | null = null
+// パン/ピンチ用の複数ポインタ管理
+const activePointers = new Map<number, { x: number; y: number }>()
+let panning = false
+let panLastX = 0
+let panLastY = 0
+let pinch: { dist: number; midX: number; midY: number; zoom: number; sPanX: number; sPanY: number } | null = null
+let spaceDown = false
+let hoverX = -1
+let hoverY = -1
 const undoStack: Uint8ClampedArray[] = []
 const redoStack: Uint8ClampedArray[] = []
 const MAX_HISTORY = 40
@@ -227,6 +257,29 @@ function setPaintColor(r: number, g: number, b: number, index = -1): void {
   selectedSwatch =
     index >= 0 ? index : cur.colors.findIndex((c) => c.r === r && c.g === g && c.b === b)
   renderSwatchesActiveOnly(cur)
+  pushRecentColor(r, g, b)
+}
+
+// 最近使った色（重複除去・先頭が新しい・最大12）
+function pushRecentColor(r: number, g: number, b: number): void {
+  const idx = recentColors.findIndex((c) => c.r === r && c.g === g && c.b === b)
+  if (idx >= 0) recentColors.splice(idx, 1)
+  recentColors.unshift({ r, g, b })
+  if (recentColors.length > 12) recentColors.length = 12
+  renderRecentColors()
+}
+function renderRecentColors(): void {
+  recentSwatches.innerHTML = ''
+  recentColors.forEach((c) => {
+    const sw = document.createElement('button')
+    sw.type = 'button'
+    sw.className = 'swatch'
+    sw.style.background = `rgb(${c.r},${c.g},${c.b})`
+    sw.setAttribute('role', 'listitem')
+    sw.title = toHex(c)
+    sw.addEventListener('click', () => setPaintColor(c.r, c.g, c.b))
+    recentSwatches.appendChild(sw)
+  })
 }
 
 // 編集エリア側のスウォッチ（描く色の候補・クリックで選択のみ）
@@ -468,6 +521,7 @@ function render(): void {
     currentFrame = 0
     lastResult = frames[0]
     edited = false
+    viewZoom = 0 // 新しい画像はフィット表示から
     resetHistory()
   } else if (sizeChanged) {
     // サイズ変更は全コマの作り直し＝破壊的。コマ複数 or 手描き済みなら確認して守る。
@@ -487,6 +541,7 @@ function render(): void {
     currentFrame = 0
     lastResult = frames[0]
     edited = false
+    viewZoom = 0
     resetHistory()
     mapData.fill(-1) // タイルサイズが変わるとマップ配置は無効
   } else if (frames.length === 1 && !edited) {
@@ -528,67 +583,125 @@ function updateExportSizeLabel(): void {
   infoExport.textContent = sourceImage ? label : '—'
 }
 
-// 表示ズーム。通常は出力枠の幅いっぱいに、拡大編集モーダル中はビューポートに合わせて大きく。
-function editZoom(): number {
-  if (!lastResult) return 1
-  let maxW: number
-  let maxH: number
-  if (isModal) {
-    maxW = window.innerWidth * 0.9
-    maxH = window.innerHeight * 0.78
-  } else {
-    maxW = (canvasWrap.clientWidth || 360) - 20 // 出力枠の幅に追従
-    maxH = window.innerHeight * 0.6
-  }
-  const z = Math.floor(Math.min(maxW / lastResult.width, maxH / lastResult.height))
-  return Math.max(1, Math.min(40, z))
-}
-
 let currentZoom = 1
+// 出力canvasを表示枠(canvasWrap)いっぱいのビューポートにする。中身をズーム/パンして描く。
+function sizeViewport(): void {
+  const w = Math.max(1, Math.floor(canvasWrap.clientWidth))
+  const h = Math.max(1, Math.floor(canvasWrap.clientHeight))
+  if (outCanvas.width !== w) outCanvas.width = w
+  if (outCanvas.height !== h) outCanvas.height = h
+  outCanvas.style.width = `${w}px`
+  outCanvas.style.height = `${h}px`
+}
+// フィット倍率（画像全体がビューポートに収まる倍率。大画像では1未満になる）
+function fitScale(): number {
+  if (!lastResult) return 1
+  const vw = outCanvas.width
+  const vh = outCanvas.height
+  return Math.max(0.02, Math.min(vw / lastResult.width, vh / lastResult.height))
+}
+function minZoom(): number {
+  return Math.max(0.05, fitScale() * 0.5)
+}
+function clampPan(p: number, view: number, content: number): number {
+  if (content <= view) return Math.round((view - content) / 2) // 収まるときは中央寄せ
+  return Math.min(0, Math.max(view - content, p)) // はみ出すときは端で止める
+}
+// currentZoom / panX / panY を確定（viewZoom<=0 はフィット＝中央）
+function computeView(): void {
+  if (!lastResult) return
+  const vw = outCanvas.width
+  const vh = outCanvas.height
+  if (viewZoom <= 0) {
+    currentZoom = fitScale()
+    panX = Math.round((vw - lastResult.width * currentZoom) / 2)
+    panY = Math.round((vh - lastResult.height * currentZoom) / 2)
+  } else {
+    currentZoom = viewZoom
+    panX = clampPan(panX, vw, lastResult.width * currentZoom)
+    panY = clampPan(panY, vh, lastResult.height * currentZoom)
+  }
+}
 function drawOutput(): void {
   if (!lastResult) return
-  currentZoom = editZoom()
-  const zoom = currentZoom
-  outCanvas.width = lastResult.width * zoom
-  outCanvas.height = lastResult.height * zoom
+  sizeViewport()
+  computeView()
   const ctx = outCanvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  ctx.clearRect(0, 0, outCanvas.width, outCanvas.height)
+  ctx.clearRect(0, 0, outCanvas.width, outCanvas.height) // 透明クリア→枠のチェッカーが透ける
+  const z = currentZoom
+  const iw = lastResult.width * z
+  const ih = lastResult.height * z
   // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。（再生中は出さない）
   const rm = playing ? 'none' : refMode.value
   const alpha = Number(onionOpacity.value)
   if (rm === 'source' && sourceImage) {
     ctx.globalAlpha = alpha
     ctx.imageSmoothingEnabled = true // 写真はなめらかに敷く（位置合わせの下絵用）
-    ctx.drawImage(imageToCanvas(sourceImage), 0, 0, outCanvas.width, outCanvas.height)
+    ctx.drawImage(imageToCanvas(sourceImage), panX, panY, iw, ih)
     ctx.imageSmoothingEnabled = false
     ctx.globalAlpha = 1
   } else if (rm === 'prev' && currentFrame > 0 && frames[currentFrame - 1]) {
     ctx.globalAlpha = alpha
-    ctx.drawImage(imageToCanvas(frames[currentFrame - 1]), 0, 0, outCanvas.width, outCanvas.height)
+    ctx.drawImage(imageToCanvas(frames[currentFrame - 1]), panX, panY, iw, ih)
     ctx.globalAlpha = 1
   }
-  ctx.drawImage(imageToCanvas(lastResult), 0, 0, outCanvas.width, outCanvas.height)
-  if (showGrid && zoom >= 4) drawGrid()
+  ctx.drawImage(imageToCanvas(lastResult), panX, panY, iw, ih)
+  if (pendingShape) drawPendingShape(ctx)
+  if (showGrid && z >= 4) drawGrid()
+  updateEditHud()
+}
+
+// 直線/矩形のドラッグ中プレビュー（確定色で半透明表示）
+function drawPendingShape(ctx: CanvasRenderingContext2D): void {
+  if (!pendingShape || !lastResult) return
+  const z = currentZoom
+  const pts = tool === 'rect' ? rectPixels(pendingShape) : linePixels(pendingShape)
+  ctx.globalAlpha = 0.7
+  ctx.fillStyle = tool === 'eraser' ? 'rgba(255,120,120,0.9)' : `rgb(${paint.r},${paint.g},${paint.b})`
+  for (const [x, y] of pts) ctx.fillRect(Math.round(panX + x * z), Math.round(panY + y * z), Math.ceil(z), Math.ceil(z))
+  ctx.globalAlpha = 1
 }
 
 function drawGrid(): void {
   if (!lastResult) return
   const ctx = outCanvas.getContext('2d')!
+  const z = currentZoom
   ctx.strokeStyle = 'rgba(128,128,128,0.45)'
   ctx.lineWidth = 1
   ctx.beginPath()
   for (let x = 0; x <= lastResult.width; x++) {
-    const px = x * currentZoom + 0.5
-    ctx.moveTo(px, 0)
-    ctx.lineTo(px, outCanvas.height)
+    const px = Math.round(panX + x * z) + 0.5
+    ctx.moveTo(px, panY)
+    ctx.lineTo(px, panY + lastResult.height * z)
   }
   for (let y = 0; y <= lastResult.height; y++) {
-    const py = y * currentZoom + 0.5
-    ctx.moveTo(0, py)
-    ctx.lineTo(outCanvas.width, py)
+    const py = Math.round(panY + y * z) + 0.5
+    ctx.moveTo(panX, py)
+    ctx.lineTo(panX + lastResult.width * z, py)
   }
   ctx.stroke()
+}
+
+// ズーム操作（cx,cy 画面座標を基準点に保つ）
+function setZoom(newZoom: number, cx: number, cy: number): void {
+  if (!lastResult) return
+  const old = currentZoom
+  const z = Math.max(minZoom(), Math.min(64, newZoom))
+  const ix = (cx - panX) / old
+  const iy = (cy - panY) / old
+  viewZoom = z
+  currentZoom = z
+  panX = cx - ix * z
+  panY = cy - iy * z
+  drawOutput()
+}
+function zoomBy(factor: number): void {
+  setZoom(currentZoom * factor, outCanvas.width / 2, outCanvas.height / 2)
+}
+function fitView(): void {
+  viewZoom = 0
+  drawOutput()
 }
 
 function imageToCanvas(img: PixelImage): HTMLCanvasElement {
@@ -713,6 +826,7 @@ newBlankBtn.addEventListener('click', () => {
   frames = [blankFrame(w, h)]
   currentFrame = 0
   lastResult = frames[0]
+  viewZoom = 0 // フィット表示から
 
   // 入力プレビューは空に、情報を更新
   srcCanvas.width = 1
@@ -818,21 +932,33 @@ toEditBtn.addEventListener('click', () => setMode('edit'))
 // レタッチ・エディタ（出力画像をピクセル単位で編集）
 // ============================================================
 
-function eventToPixel(e: PointerEvent): { x: number; y: number } | null {
+// 画面座標→画像ピクセル（パン/ズーム反映）。枠外は null。
+function eventToPixel(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
   if (!lastResult) return null
   const rect = outCanvas.getBoundingClientRect()
-  const x = Math.floor(((e.clientX - rect.left) / rect.width) * lastResult.width)
-  const y = Math.floor(((e.clientY - rect.top) / rect.height) * lastResult.height)
+  const x = Math.floor((e.clientX - rect.left - panX) / currentZoom)
+  const y = Math.floor((e.clientY - rect.top - panY) / currentZoom)
   if (x < 0 || y < 0 || x >= lastResult.width || y >= lastResult.height) return null
   return { x, y }
 }
+// 枠外でも端にクランプして返す（直線/矩形のドラッグ用）
+function eventToPixelClamped(e: { clientX: number; clientY: number }): { x: number; y: number } | null {
+  if (!lastResult) return null
+  const rect = outCanvas.getBoundingClientRect()
+  const x = Math.floor((e.clientX - rect.left - panX) / currentZoom)
+  const y = Math.floor((e.clientY - rect.top - panY) / currentZoom)
+  return {
+    x: Math.max(0, Math.min(lastResult.width - 1, x)),
+    y: Math.max(0, Math.min(lastResult.height - 1, y)),
+  }
+}
 
-function paintPixel(x: number, y: number): void {
-  if (!lastResult) return
+// 1画素を設定（範囲チェック込み）
+function setPx(x: number, y: number): void {
+  if (!lastResult || x < 0 || y < 0 || x >= lastResult.width || y >= lastResult.height) return
   const i = (y * lastResult.width + x) * 4
   const d = lastResult.data
   if (tool === 'eraser') {
-    // 透明領域を均一化（RGBも0に）。塗りつぶし等の連結判定を安定させる。
     d[i] = 0
     d[i + 1] = 0
     d[i + 2] = 0
@@ -843,6 +969,77 @@ function paintPixel(x: number, y: number): void {
     d[i + 2] = paint.b
     d[i + 3] = 255
   }
+}
+
+// ブラシ径＋ミラー（左右/上下対称）を反映して1点を打つ
+function paintPixel(x: number, y: number): void {
+  if (!lastResult) return
+  const r = brush
+  const off = Math.floor((r - 1) / 2)
+  const stamp = (cx: number, cy: number) => {
+    for (let dy = 0; dy < r; dy++) for (let dx = 0; dx < r; dx++) setPx(cx - off + dx, cy - off + dy)
+  }
+  stamp(x, y)
+  const w = lastResult.width
+  const h = lastResult.height
+  if (mirrorX) stamp(w - 1 - x, y)
+  if (mirrorY) stamp(x, h - 1 - y)
+  if (mirrorX && mirrorY) stamp(w - 1 - x, h - 1 - y)
+}
+
+// 直線/矩形の構成画素
+function linePixels(s: { sx: number; sy: number; ex: number; ey: number }): [number, number][] {
+  const pts: [number, number][] = []
+  let x0 = s.sx
+  let y0 = s.sy
+  const x1 = s.ex
+  const y1 = s.ey
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+  for (;;) {
+    pts.push([x0, y0])
+    if (x0 === x1 && y0 === y1) break
+    const e2 = 2 * err
+    if (e2 > -dy) {
+      err -= dy
+      x0 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y0 += sy
+    }
+  }
+  return pts
+}
+function rectPixels(s: { sx: number; sy: number; ex: number; ey: number }): [number, number][] {
+  const x0 = Math.min(s.sx, s.ex)
+  const x1 = Math.max(s.sx, s.ex)
+  const y0 = Math.min(s.sy, s.ey)
+  const y1 = Math.max(s.sy, s.ey)
+  const pts: [number, number][] = []
+  for (let x = x0; x <= x1; x++) {
+    pts.push([x, y0], [x, y1])
+  }
+  for (let y = y0; y <= y1; y++) {
+    pts.push([x0, y], [x1, y])
+  }
+  return pts
+}
+function commitShape(): void {
+  if (!pendingShape || !lastResult) return
+  const pts = tool === 'rect' ? rectPixels(pendingShape) : linePixels(pendingShape)
+  for (const [x, y] of pts) paintPixel(x, y)
+  pendingShape = null
+}
+
+// ズーム%・カーソル座標のHUD更新
+function updateEditHud(): void {
+  const zoomPct = `${Math.round(currentZoom * 100)}%`
+  const pos = hoverX >= 0 ? ` ・ x:${hoverX} y:${hoverY}` : ''
+  editHud.textContent = lastResult ? `${zoomPct}${pos}` : ''
 }
 
 // 2点間を線で塗る（ドラッグ時の隙間防止・Bresenham）
@@ -949,17 +1146,72 @@ function updateUndoRedo(): void {
   redoBtn.disabled = redoStack.length === 0
 }
 
-// --- ポインタ操作 ---
+// --- ポインタ操作（描画 / パン / ピンチズーム） ---
 // 変換タブの出力は「プレビュー専用」。編集は「編集」/「アニメ」タブでのみ有効。
 function canPaint(): boolean {
   return document.body.dataset.mode === 'edit' || document.body.dataset.mode === 'anim'
 }
+function isPanGesture(e: PointerEvent): boolean {
+  return tool === 'pan' || spaceDown || e.button === 1 // パンツール / スペース押下 / 中ボタン
+}
+function startPinch(): void {
+  const pts = [...activePointers.values()]
+  if (pts.length < 2) return
+  const rect = outCanvas.getBoundingClientRect()
+  if (viewZoom <= 0) viewZoom = currentZoom // フィット解除して倍率を固定化
+  pinch = {
+    dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+    midX: (pts[0].x + pts[1].x) / 2 - rect.left,
+    midY: (pts[0].y + pts[1].y) / 2 - rect.top,
+    zoom: currentZoom,
+    sPanX: panX,
+    sPanY: panY,
+  }
+}
+function updatePinch(): void {
+  if (!pinch) return
+  const pts = [...activePointers.values()]
+  if (pts.length < 2) return
+  const rect = outCanvas.getBoundingClientRect()
+  const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+  const midX = (pts[0].x + pts[1].x) / 2 - rect.left
+  const midY = (pts[0].y + pts[1].y) / 2 - rect.top
+  const z = Math.max(minZoom(), Math.min(64, pinch.zoom * (dist / pinch.dist)))
+  const ix = (pinch.midX - pinch.sPanX) / pinch.zoom
+  const iy = (pinch.midY - pinch.sPanY) / pinch.zoom
+  viewZoom = z
+  currentZoom = z
+  panX = midX - ix * z
+  panY = midY - iy * z
+  drawOutput()
+}
+
 outCanvas.addEventListener('pointerdown', (e) => {
   if (!lastResult || !canPaint()) return
   if (playing) stopPlay() // 編集を始めたら再生停止
+  e.preventDefault()
+  outCanvas.setPointerCapture(e.pointerId)
+  activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+
+  // 2本目の指 → ピンチ（ズーム＋パン）。進行中の描画は中断。
+  if (activePointers.size === 2) {
+    painting = false
+    pendingShape = null
+    startPinch()
+    return
+  }
+  if (activePointers.size > 2) return
+
+  if (isPanGesture(e)) {
+    panning = true
+    panLastX = e.clientX
+    panLastY = e.clientY
+    updateCanvasCursor()
+    return
+  }
+
   const p = eventToPixel(e)
   if (!p) return
-  e.preventDefault()
   if (tool === 'eyedropper') {
     pickColor(p.x, p.y)
     return
@@ -973,28 +1225,94 @@ outCanvas.addEventListener('pointerdown', (e) => {
     }
     return
   }
+  if (tool === 'line' || tool === 'rect') {
+    pushUndo()
+    pendingShape = { sx: p.x, sy: p.y, ex: p.x, ey: p.y }
+    drawOutput()
+    return
+  }
+  // ペン / 消しゴム
   pushUndo()
   painting = true
   lastPx = p.x
   lastPy = p.y
-  outCanvas.setPointerCapture(e.pointerId)
   paintPixel(p.x, p.y)
   drawOutput()
 })
+
 outCanvas.addEventListener('pointermove', (e) => {
-  if (!painting || !lastResult || !canPaint()) return
-  const p = eventToPixel(e)
-  if (!p) return
-  strokeLine(lastPx, lastPy, p.x, p.y)
-  lastPx = p.x
-  lastPy = p.y
-  drawOutput()
+  if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  const hp = eventToPixel(e)
+  hoverX = hp ? hp.x : -1
+  hoverY = hp ? hp.y : -1
+
+  if (pinch && activePointers.size >= 2) {
+    updatePinch()
+    return
+  }
+  if (panning) {
+    e.preventDefault()
+    panX += e.clientX - panLastX
+    panY += e.clientY - panLastY
+    panLastX = e.clientX
+    panLastY = e.clientY
+    if (viewZoom <= 0) viewZoom = currentZoom // パンし始めたらフィット解除
+    drawOutput()
+    return
+  }
+  if (!canPaint()) return
+  if (pendingShape) {
+    const rp = eventToPixelClamped(e)
+    if (rp) {
+      pendingShape.ex = rp.x
+      pendingShape.ey = rp.y
+      drawOutput()
+    }
+    return
+  }
+  if (painting) {
+    e.preventDefault()
+    const p = eventToPixel(e)
+    if (!p) {
+      updateEditHud()
+      return
+    }
+    strokeLine(lastPx, lastPy, p.x, p.y)
+    lastPx = p.x
+    lastPy = p.y
+    drawOutput()
+    return
+  }
+  updateEditHud()
 })
-const endStroke = () => {
-  painting = false
+
+function endPointer(e: PointerEvent): void {
+  activePointers.delete(e.pointerId)
+  if (activePointers.size < 2) pinch = null
+  if (painting) painting = false
+  if (panning && activePointers.size === 0) {
+    panning = false
+    updateCanvasCursor()
+  }
+  if (pendingShape && activePointers.size === 0) {
+    commitShape()
+    drawOutput()
+  }
 }
-outCanvas.addEventListener('pointerup', endStroke)
-outCanvas.addEventListener('pointercancel', endStroke)
+outCanvas.addEventListener('pointerup', endPointer)
+outCanvas.addEventListener('pointercancel', endPointer)
+
+// ホイールでカーソル基準ズーム
+outCanvas.addEventListener(
+  'wheel',
+  (e) => {
+    if (!lastResult || !canPaint()) return
+    e.preventDefault()
+    const rect = outCanvas.getBoundingClientRect()
+    setZoom(currentZoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - rect.left, e.clientY - rect.top)
+  },
+  { passive: false }
+)
 
 // --- ツール選択 ---
 function selectTool(t: Tool): void {
@@ -1007,8 +1325,9 @@ function selectTool(t: Tool): void {
 editorToolbar.querySelectorAll<HTMLElement>('.tool').forEach((btn) => {
   btn.addEventListener('click', () => selectTool(btn.dataset.tool as Tool))
 })
-// ツール別カーソル（SVGデータURI・ホットスポット付き）
-const CURSORS: Record<Tool, { svg: string; hx: number; hy: number; fb: string }> = {
+// ツール別カーソル（SVGデータURI・ホットスポット付き）。pan/line/rect はCSSカーソルで扱う。
+type CursorTool = 'pencil' | 'eraser' | 'bucket' | 'eyedropper'
+const CURSORS: Record<CursorTool, { svg: string; hx: number; hy: number; fb: string }> = {
   pencil: {
     svg: "<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18'><path d='M2 16l1-4L12 3l3 3L7 15z' fill='#ffd54a' stroke='#000'/><path d='M11 4l3 3' stroke='#000'/></svg>",
     hx: 1,
@@ -1039,6 +1358,14 @@ function updateCanvasCursor(): void {
     outCanvas.style.cursor = 'default' // 変換タブ等はプレビュー専用
     return
   }
+  if (tool === 'pan') {
+    outCanvas.style.cursor = panning ? 'grabbing' : 'grab'
+    return
+  }
+  if (tool === 'line' || tool === 'rect') {
+    outCanvas.style.cursor = 'crosshair'
+    return
+  }
   const c = CURSORS[tool]
   outCanvas.style.cursor = `url("data:image/svg+xml,${encodeURIComponent(c.svg)}") ${c.hx} ${c.hy}, ${c.fb}`
 }
@@ -1053,6 +1380,98 @@ gridToggle.addEventListener('change', () => {
 })
 undoBtn.addEventListener('click', undo)
 redoBtn.addEventListener('click', redo)
+
+// ブラシ径
+function setBrush(n: number): void {
+  brush = Math.max(1, Math.min(4, n))
+  brushSizeSel.value = String(brush)
+}
+brushSizeSel.addEventListener('change', () => setBrush(Number(brushSizeSel.value) || 1))
+// ミラー（対称描画）
+mirrorXBtn.addEventListener('click', () => {
+  mirrorX = !mirrorX
+  mirrorXBtn.classList.toggle('active', mirrorX)
+})
+mirrorYBtn.addEventListener('click', () => {
+  mirrorY = !mirrorY
+  mirrorYBtn.classList.toggle('active', mirrorY)
+})
+// 全消去
+clearCanvasBtn.addEventListener('click', () => {
+  if (!lastResult) return
+  if (!window.confirm('キャンバスを全部消して透明にします。よろしいですか？')) return
+  pushUndo()
+  lastResult.data.fill(0)
+  drawOutput()
+})
+// ズーム操作
+zoomInBtn.addEventListener('click', () => zoomBy(1.25))
+zoomOutBtn.addEventListener('click', () => zoomBy(1 / 1.25))
+zoomFitBtn.addEventListener('click', fitView)
+
+// キーボードショートカット（入力中は無効。Ctrl系はUndo/Redo側で処理）
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return
+  const t = e.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) return
+  if (e.key === ' ') {
+    spaceDown = true
+    if (canPaint()) {
+      updateCanvasCursor()
+      e.preventDefault()
+    }
+    return
+  }
+  if (!canPaint()) return
+  switch (e.key.toLowerCase()) {
+    case 'b':
+      selectTool('pencil')
+      break
+    case 'e':
+      selectTool('eraser')
+      break
+    case 'g':
+      selectTool('bucket')
+      break
+    case 'i':
+      selectTool('eyedropper')
+      break
+    case 'l':
+      selectTool('line')
+      break
+    case 'r':
+      selectTool('rect')
+      break
+    case 'h':
+      selectTool('pan')
+      break
+    case '+':
+    case '=':
+      zoomBy(1.25)
+      break
+    case '-':
+      zoomBy(1 / 1.25)
+      break
+    case '0':
+      fitView()
+      break
+    case '[':
+      setBrush(brush - 1)
+      break
+    case ']':
+      setBrush(brush + 1)
+      break
+    default:
+      return
+  }
+  e.preventDefault()
+})
+window.addEventListener('keyup', (e) => {
+  if (e.key === ' ') {
+    spaceDown = false
+    updateCanvasCursor()
+  }
+})
 
 // --- 背景切り抜き ---
 function colorDist2(r1: number, g1: number, b1: number, r2: number, g2: number, b2: number): number {
@@ -1988,6 +2407,7 @@ function setMode(mode: Mode): void {
   editorToolbar.hidden = !show.tools
   editorPalette.hidden = !show.palette
   aiPanel.hidden = !show.palette // AI生成は編集/アニメで表示（パレットと同条件）
+  zoomBar.hidden = !show.palette // ズーム操作バーも編集/アニメで表示
   frameBar.hidden = !show.frameBar
   tilemapPanel.hidden = !show.tilemap
   outputFigure.hidden = !show.output
