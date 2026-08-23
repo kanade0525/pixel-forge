@@ -5,6 +5,7 @@ import { parsePaletteText } from './palettes/parse'
 import { medianCutPalette } from './palettes/adaptive'
 import { downscale } from './downscale/downscale'
 import { quantizeImage } from './pipeline'
+import { makeZip } from './export/zip'
 
 // --- DOM 参照 ---
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
@@ -49,6 +50,7 @@ const frameDel = $<HTMLButtonElement>('frameDel')
 const refMode = $<HTMLSelectElement>('refMode') // 透かし（下絵）: none/source/prev
 const onionOpacity = $<HTMLInputElement>('onionOpacity')
 const sheetExportBtn = $<HTMLButtonElement>('sheetExport')
+const zipExportBtn = $<HTMLButtonElement>('zipExport')
 const frameStrip = $('frameStrip')
 const playBtn = $<HTMLButtonElement>('playBtn')
 const fpsInput = $<HTMLInputElement>('fpsInput')
@@ -1211,6 +1213,7 @@ function updateFrameUI(): void {
   frameDup.disabled = !has
   frameBlank.disabled = !has
   sheetExportBtn.disabled = !has
+  zipExportBtn.disabled = !has
   openModalBtn.disabled = !has
   playBtn.disabled = n < 2 // 再生は2コマ以上
   // アニメのタイムライン（サムネ）
@@ -1415,6 +1418,45 @@ sheetExportBtn.addEventListener('click', () => {
     setTimeout(() => URL.revokeObjectURL(url), 0)
     showToast(`${name} を保存しました`)
   }, 'image/png')
+})
+
+// 1コマを（拡大率を反映した）PNGのバイト列に。
+function frameToPngBytes(f: PixelImage, scale: number): Uint8Array {
+  const out = document.createElement('canvas')
+  out.width = f.width * scale
+  out.height = f.height * scale
+  const ctx = out.getContext('2d')!
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(imageToCanvas(f), 0, 0, out.width, out.height)
+  const b64 = out.toDataURL('image/png').split(',')[1] ?? ''
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes
+}
+
+// 全コマを個別PNGにして1つのZIPで保存（コマ単位でまとめてダウンロード）
+zipExportBtn.addEventListener('click', () => {
+  if (frames.length === 0) return
+  const scale = Number(exportScaleSel.value)
+  const pad = String(frames.length).length
+  try {
+    const entries = frames.map((f, i) => ({
+      name: `frame_${String(i + 1).padStart(pad, '0')}_${f.width}x${f.height}.png`,
+      data: frameToPngBytes(f, scale),
+    }))
+    const zip = makeZip(entries)
+    const blob = new Blob([zip], { type: 'application/zip' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `pixelforge_frames_${frames.length}f_x${scale}.zip`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+    showToast(`${frames.length}コマを個別PNGにしてZIP保存しました`)
+  } catch {
+    showToast('ZIP保存に失敗しました（コマ数・拡大率を下げてお試しください）')
+  }
 })
 
 // ============================================================
