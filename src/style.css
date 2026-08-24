@@ -1128,6 +1128,35 @@ canvas[aria-busy='true'] {
   .tool-options {
     gap: 4px 6px;
   }
+
+  /* #33 スマホの編集/アニメ（全画面モーダル含む）は「描く面」を主役にする。
+     既定の stage-main 子順は toolOptions→editorPalette→canvasWrap→zoomBar で、
+     約700pxの操作群の下にキャンバスが沈み描画面が見えない。order で並べ替え、
+     ツールアイコン直下にキャンバス→色パレット→表示バー→詳細オプションの順にする。
+     変換タブ（#9のsticky）には影響しないよう編集系modeにスコープする。 */
+  body[data-mode='edit'] .stage-main,
+  body[data-mode='anim'] .stage-main {
+    display: flex;
+    flex-direction: column;
+  }
+  body[data-mode='edit'] #canvasWrap,
+  body[data-mode='anim'] #canvasWrap {
+    order: -3; /* キャンバスを最上部（ツールアイコン列の直下）へ */
+  }
+  body[data-mode='edit'] #editorPalette,
+  body[data-mode='anim'] #editorPalette {
+    order: -2; /* 色パレットはキャンバス直下（色替えが多いため近くに） */
+  }
+  body[data-mode='edit'] #zoomBar,
+  body[data-mode='anim'] #zoomBar {
+    order: -1; /* ズーム/フィットはパレットの下 */
+  }
+  /* #toolOptions（サイズ変更・背景消し・反転・全消去・保存など）は order:0=自然順で最後 */
+
+  /* 全画面モーダルはツールアイコン＋キャンバス＋色の一部が1画面に収まる高さに */
+  .modal-slot #canvasWrap {
+    height: 68vh;
+  }
 }
 
 /* 情報カード */

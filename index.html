@@ -446,7 +446,7 @@
             <section class="tilemap-panel" id="tilemapPanel">
               <h3 class="sec-title" data-help="tilemap">タイルマップ（タイルを並べて地図・シーンを作る）</h3>
               <p class="help">
-                描いた「コマ」をタイルとして格子に並べ、大きな絵（マップ）を作れます。下でタイルを選び、マップをクリック/ドラッグで配置。右クリックで消去。
+                描いた「コマ」をタイルとして格子に並べ、大きな絵（マップ）を作れます。下でタイルを選び、マップをタップ／クリックやドラッグで配置。消すときは「空」を選んでタップ（PCは右クリックでも消せます）。
                 ※コマ（フレーム）を増やすと、そのぶんタイルの種類が増えます。
               </p>
               <div class="field-row">
@@ -457,7 +457,7 @@
                 <button id="mapClear" class="btn" type="button" title="マップを全部空にします">全消去</button>
                 <button id="mapExport" class="btn btn-default" type="button" title="並べたマップを1枚のPNGで保存">マップを書き出し</button>
               </div>
-              <span class="editor-palette-label">タイルを選ぶ（右クリックで配置消去）</span>
+              <span class="editor-palette-label">タイルを選ぶ（消すときは「空」を選んでタップ／PCは右クリックでも可）</span>
               <div id="tilePicker" class="tile-picker" role="list" aria-label="タイル一覧"></div>
               <div class="canvas-wrap" id="mapWrap">
                 <canvas id="mapCanvas" aria-label="タイルマップ（クリック/ドラッグで配置）"></canvas>
