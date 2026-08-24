@@ -260,6 +260,9 @@ body {
   color: var(--muted);
   font-size: 13px;
 }
+.details-bar .tagline-short {
+  display: none;
+}
 .tour-start {
   margin-left: auto;
   flex: 0 0 auto;
@@ -320,6 +323,24 @@ body {
   font-weight: 700;
   margin-bottom: -1px;
 }
+/* #7: タブ間の「→」区切り（1本の流れを可視化。.tab とは別クラスで切替ロジックに無影響） */
+.app-tabs .tab-sep {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--muted);
+  font-size: 13px;
+  pointer-events: none;
+  user-select: none;
+}
+/* #7: タブ直下に流れ説明を常設（アクティブタブと地続きの surface 背景） */
+.tab-flow {
+  flex: none;
+  padding: 4px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+}
 
 /* レイアウト（モード別の列構成） */
 .app-grid {
@@ -352,12 +373,40 @@ figure {
   .app-grid {
     grid-template-columns: 1fr;
   }
-  /* 変換モードのモバイルは「設定 → プレビュー」の自然順（設定が画面外に消えないように） */
   .details-bar .tagline-detail {
     display: none;
   }
+  /* #16: モバイルは短縮タグラインを1行表示（省略記号で折り返し防止） */
+  .details-bar .tagline-short {
+    display: inline;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .canvas-wrap {
     min-height: 120px;
+  }
+  /* #9: モバイル変換で結果が画面外にならないよう、出力プレビューを上部にsticky固定。
+     設定変更は render()→drawOutput() で即時再描画され、貼り付いた出力に反映される。 */
+  body[data-mode='convert'].has-image .preview {
+    order: -1;
+  }
+  body[data-mode='convert'].has-image .preview-grid #outputFigure {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    padding-bottom: 8px;
+    box-shadow: 0 8px 10px -10px rgba(0, 0, 0, 0.4);
+  }
+  body[data-mode='convert'].has-image .preview-grid #inputFigure {
+    order: 0;
+  }
+  body[data-mode='convert'].has-image #outputFigure #canvasWrap {
+    height: 34vh;
   }
 }
 
@@ -542,6 +591,36 @@ details summary {
   color: var(--accent);
   margin-top: 6px;
 }
+/* #10: 変換パネルのセクション折りたたみ（情報密度を下げ基本導線だけ初期表示） */
+details.sec-collapse {
+  margin: 0;
+}
+details.sec-collapse > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin: 0 0 10px;
+  color: var(--text);
+}
+details.sec-collapse > summary::-webkit-details-marker {
+  display: none;
+}
+details.sec-collapse > summary::before {
+  content: '▸';
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+details.sec-collapse[open] > summary::before {
+  transform: rotate(90deg);
+}
+details.sec-collapse > summary .sec-title {
+  margin: 0;
+}
 
 /* エディタ（Aseprite/Piskel風: 左アイコン列＋上オプション＋操作分離） */
 .editor-stage {
@@ -661,17 +740,43 @@ details summary {
 
 /* AI生成パネル */
 .ai-panel {
-  margin: 8px 0;
-  border: 1px solid var(--border);
+  margin: var(--space-2) 0;
+  border: 1px solid var(--accent);
   border-radius: var(--radius);
-  padding: 6px 10px;
-  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
 }
 .ai-panel > summary {
   cursor: pointer;
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+  font-size: var(--fs-ui);
   font-weight: 600;
   color: var(--accent);
+}
+.ai-panel > summary .icon {
+  color: var(--accent);
+}
+.ai-req-badge {
+  margin-left: auto;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  background: var(--surface);
+}
+.ai-setup-note {
+  margin: 0 0 var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
 }
 .ai-body {
   margin-top: 8px;
@@ -949,11 +1054,29 @@ canvas[aria-busy='true'] {
 }
 .empty-state {
   position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
   color: var(--muted);
   font-size: 13px;
   text-align: center;
-  pointer-events: none;
-  padding: 0 12px;
+  pointer-events: none; /* キャンバスの描画/クリックを妨げない */
+  padding: 0 var(--space-4);
+}
+.empty-state-text {
+  margin: 0;
+  max-width: 32em;
+  line-height: 1.6;
+}
+.empty-state-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+  pointer-events: auto; /* ボタンだけは操作可能 */
 }
 
 /* お絵描きビューポート（ズーム/パン）: 出力キャンバスは枠いっぱいのビューポート */
@@ -1285,6 +1408,7 @@ body[data-stage='start'] .window-pane > :not(#startScreen) {
   display: none;
 }
 body[data-stage='start'] .app-tabs,
+body[data-stage='start'] .tab-flow,
 body[data-stage='start'] .details-bar {
   display: none;
 }

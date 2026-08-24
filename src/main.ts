@@ -39,6 +39,7 @@ const editAddColorBtn = $<HTMLButtonElement>('editAddColor')
 const editCustomPalette = $<HTMLTextAreaElement>('editCustomPalette')
 const editApplyCustom = $<HTMLButtonElement>('editApplyCustom')
 const editCustomStatus = $('editCustomStatus')
+const editPaletteNote = $('editPaletteNote')
 const customPaletteText = $<HTMLTextAreaElement>('customPalette')
 // エディタ（レタッチ）
 const paintColorInput = $<HTMLInputElement>('paintColor')
@@ -113,6 +114,8 @@ const infoCard = $('infoCard')
 const tilePicker = $('tilePicker')
 const mapCanvas = $<HTMLCanvasElement>('mapCanvas')
 const mapEmpty = $('mapEmpty')
+const mapEmptyBlankBtn = $<HTMLButtonElement>('mapEmptyBlank')
+const mapEmptyToConvertBtn = $<HTMLButtonElement>('mapEmptyToConvert')
 const mapColsInput = $<HTMLInputElement>('mapCols')
 const mapRowsInput = $<HTMLInputElement>('mapRows')
 const mapClearBtn = $<HTMLButtonElement>('mapClear')
@@ -129,6 +132,7 @@ const strengthVal = $('strengthVal')
 const downscaleSel = $<HTMLSelectElement>('downscale')
 const deltaModeSel = $<HTMLSelectElement>('deltaMode')
 const exportScaleSel = $<HTMLSelectElement>('exportScale')
+const exportScaleEditSel = $<HTMLSelectElement>('exportScaleEdit')
 const exportSizeLabel = $('exportSizeLabel')
 const exportBtn = $<HTMLButtonElement>('exportBtn')
 const srcCanvas = $<HTMLCanvasElement>('srcCanvas')
@@ -136,6 +140,10 @@ const canvasWrap = $('canvasWrap')
 const outCanvas = $<HTMLCanvasElement>('outCanvas')
 const outLabel = $('outLabel')
 const emptyState = $('emptyState')
+const emptyStateText = $('emptyStateText')
+const emptyToConvertBtn = $<HTMLButtonElement>('emptyToConvert')
+const emptyBlankBtn = $<HTMLButtonElement>('emptyBlank')
+const emptyAddImagesBtn = $<HTMLButtonElement>('emptyAddImages')
 const toast = $('toast')
 const infoSrc = $('infoSrc')
 const infoOut = $('infoOut')
@@ -647,6 +655,7 @@ function updateExportSizeLabel(): void {
   const scale = Number(exportScaleSel.value)
   const label = `${w * scale}×${h * scale}px`
   exportSizeLabel.textContent = label
+  if (exportScaleEditSel.value !== exportScaleSel.value) exportScaleEditSel.value = exportScaleSel.value // 編集/アニメ側へミラー
   infoExport.textContent = sourceImage ? label : '—'
 }
 
@@ -969,7 +978,8 @@ newBlankBtn.addEventListener('click', () => {
   document.body.classList.add('has-image')
 
   // 自動生成は元画像が要るので、白紙では固定パレットへ切替
-  if (isAdaptive()) {
+  const switchedFromAdaptive = isAdaptive()
+  if (switchedFromAdaptive) {
     paletteSelect.value = 'endesga32'
     updatePaletteUI()
   }
@@ -990,7 +1000,18 @@ newBlankBtn.addEventListener('click', () => {
   edited = false
   setMode('edit') // 白紙は「描き始める」操作 → 編集タブへ着地（ペン＋パレットが揃う）
   enterWork() // スタート画面 → 作業画面（編集）へ
-  showToast(`白紙キャンバス ${w}×${h} を作成しました。編集タブで描けます`)
+  // 自動生成→固定パレットへ切替えた理由を、トースト＋パレット欄の注記で明示（無言の切替を防ぐ）
+  if (switchedFromAdaptive) {
+    const palLabel = paletteSelect.selectedOptions[0]?.textContent ?? 'Endesga 32'
+    editPaletteNote.textContent = `「画像から自動生成」は元画像が要るため「${palLabel}」に切替えました`
+    editPaletteNote.hidden = false
+    showToast(
+      `白紙キャンバス ${w}×${h} を作成しました。自動生成は元画像が要るため、パレットを「${palLabel}」に切替えました`
+    )
+  } else {
+    editPaletteNote.hidden = true
+    showToast(`白紙キャンバス ${w}×${h} を作成しました。編集タブで描けます`)
+  }
 })
 
 const rerenderEls = [bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
@@ -998,6 +1019,11 @@ rerenderEls.forEach((el) => el.addEventListener('input', onControlChange))
 // 出力サイズは確定時(change)のみ反映。keystroke毎に確認ダイアログが出る/途中値で潰れるのを防ぐ。
 ;[outW, outH].forEach((el) => el.addEventListener('change', onControlChange))
 exportScaleSel.addEventListener('input', updateExportSizeLabel)
+// 編集/アニメの共有拡大率 → 単一の真実(#exportScale)へ同期
+exportScaleEditSel.addEventListener('input', () => {
+  exportScaleSel.value = exportScaleEditSel.value
+  updateExportSizeLabel()
+})
 document
   .querySelectorAll('input[name="dither"]')
   .forEach((el) => el.addEventListener('change', onControlChange))
@@ -1028,6 +1054,7 @@ function onControlChange(): void {
 }
 
 paletteSelect.addEventListener('change', () => {
+  editPaletteNote.hidden = true // ユーザーが自分でパレットを選び直したら切替理由の注記は不要
   updatePaletteUI()
   // 自動生成は画像がある時だけ render() で色を埋める。画像が無い（白紙編集）ときは
   // 空にせずフォールバック色を表示（白紙ユーザーがパレット無しにならないように）。
@@ -1088,6 +1115,12 @@ populateEditPaletteSelect()
 exportBtn.addEventListener('click', exportPng)
 exportEditBtn.addEventListener('click', exportPng)
 toEditBtn.addEventListener('click', () => setMode('edit'))
+// 空状態（画像なしで編集/アニメ/タイルマップに着地したとき）の「次の一手」
+emptyToConvertBtn.addEventListener('click', () => setMode('convert'))
+emptyBlankBtn.addEventListener('click', () => newBlankBtn.click())
+emptyAddImagesBtn.addEventListener('click', () => addImagesBtn.click())
+mapEmptyBlankBtn.addEventListener('click', () => newBlankBtn.click())
+mapEmptyToConvertBtn.addEventListener('click', () => setMode('convert'))
 
 // ============================================================
 // レタッチ・エディタ（出力画像をピクセル単位で編集）
@@ -1883,18 +1916,22 @@ function updateOutputAffordances(): void {
   toEditBtn.hidden = !(mode === 'convert' && has) // 変換タブでのみ「編集へ」CTA
   // 全画面編集ボタンは編集/アニメのみ。モーダル表示中は重複防止で隠す
   openModalBtn.hidden = isModal || !((mode === 'edit' || mode === 'anim') && has)
-  emptyState.textContent =
+  emptyStateText.textContent =
     mode === 'convert'
       ? '左で画像を読み込むと、ここに変換結果が表示されます'
       : mode === 'edit'
-        ? '「変換」タブで画像を読み込むか「白紙から作る」で始めましょう'
-        : '「画像を複数追加」で連番画像を取り込むか、「変換」タブで1枚作るとコマになります'
+        ? '画像がありません。「変換」タブで読み込むか、白紙から描き始めましょう'
+        : '画像がありません。連番画像を取り込むか、「変換」タブで1枚作るとコマになります'
+  // 空状態の「次の一手」ボタンをモード別に出し分け（convertは左に操作があるので不要）
+  emptyToConvertBtn.hidden = mode === 'convert'
+  emptyBlankBtn.hidden = mode !== 'edit'
+  emptyAddImagesBtn.hidden = mode !== 'anim'
   updateCanvasCursor() // 描ける/描けないでカーソルを切替
 }
 
 function updateFrameUI(): void {
   const n = frames.length
-  frameLabel.textContent = n === 0 ? '—' : `${currentFrame + 1} / ${n}`
+  frameLabel.textContent = n === 0 ? '—' : `コマ ${currentFrame + 1} / ${n}`
   const has = n > 0 && !!lastResult
   framePrev.disabled = currentFrame <= 0
   frameNext.disabled = currentFrame >= n - 1
