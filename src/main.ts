@@ -7,6 +7,7 @@ import { downscale } from './downscale/downscale'
 import { quantizeImage } from './pipeline'
 import { makeZip } from './export/zip'
 import { initTour } from './tour'
+import { initHelp } from './help'
 
 // --- DOM 参照 ---
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
@@ -2448,3 +2449,4 @@ updateFrameUI()
 if (!isAdaptive()) renderPalette(activePalette())
 setMode('convert') // 初期は「変換」モード
 initTour(setMode) // 使い方ガイド（初回自動＋「? 使い方」ボタン）。操作は妨げない
+initHelp() // 各項目の常設「?」ヘルプ（タップで説明・スマホ対応）
