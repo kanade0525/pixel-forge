@@ -212,7 +212,7 @@
               <figure id="outputFigure">
                 <figcaption>
                   出力（<span id="outLabel">16×16</span>・<span id="outHint">プレビュー</span>）
-                  <button id="toEdit" class="cap-btn" type="button" title="この変換結果を「編集」タブで手直しします" hidden>✎ 編集タブで手直し</button>
+                  <button id="toEdit" class="cap-btn" type="button" title="この変換結果を「編集」タブで手直しします" hidden>編集タブで手直し</button>
                   <button id="openModal" class="cap-btn" type="button" title="編集画面を大きく開きます（細かい作業向け）" disabled hidden>全画面で編集</button>
                 </figcaption>
                 <div class="editor-stage" id="editorStage">
@@ -260,8 +260,8 @@
                       <label class="opt" title="ドットの境目にマス目を表示"><input id="gridToggle" type="checkbox" /> マス目</label>
                       <span class="opt-spacer"></span>
                       <div class="tool-actions" aria-label="操作">
-                        <button id="undoBtn" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled>↶</button>
-                        <button id="redoBtn" title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled>↷</button>
+                        <button id="undoBtn" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6a4 4 0 0 1 0 8H6"/><path d="M7 8L4.5 5.5M7 8l-2.5 2.5"/></svg></button>
+                        <button id="redoBtn" title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H7a4 4 0 0 0 0 8h7"/><path d="M13 8l2.5-2.5M13 8l2.5 2.5"/></svg></button>
                         <button id="flipH" title="左右反転（向き違いのスプライト作成に）" disabled>左右反転</button>
                         <button id="flipV" title="上下反転" disabled>上下反転</button>
                         <button id="clearCanvas" title="キャンバスを全部消して透明にします">全消去</button>
@@ -318,7 +318,7 @@
                     <input id="onionOpacity" type="range" min="0.1" max="0.85" step="0.05" value="0.4" disabled />
                   </label>
                   <div class="tool-group" title="コマを順に表示してアニメを確認">
-                    <button id="playBtn" disabled title="コマを順に再生してアニメを確認">▶ 再生</button>
+                    <button id="playBtn" disabled title="コマを順に再生してアニメを確認">再生</button>
                     <label class="grid-toggle" title="1秒あたりのコマ数（速さ）">
                       FPS <input id="fpsInput" type="number" min="1" max="30" value="8" style="width:56px" />
                     </label>
@@ -340,7 +340,7 @@
                 </div>
 
                 <details class="ai-panel" id="aiPanel">
-                  <summary title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">✨ AIで下絵を作る（β・Gemini）</summary>
+                  <summary title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">AIで下絵を作る（β・Gemini）</summary>
                   <div class="ai-body">
                     <textarea id="aiPrompt" rows="2" placeholder="例：剣を持ったドット絵の勇者、正面向き、背景は無地"></textarea>
                     <div class="field-row">
@@ -428,7 +428,7 @@
       <div class="modal-inner" role="dialog" aria-modal="true" aria-label="全画面で編集">
         <div class="modal-head">
           <span class="modal-title">全画面で編集</span>
-          <button id="closeModal" class="btn modal-close" type="button">✕ 閉じる</button>
+          <button id="closeModal" class="btn modal-close" type="button">閉じる</button>
         </div>
         <div class="modal-slot" id="modalSlot"></div>
       </div>
