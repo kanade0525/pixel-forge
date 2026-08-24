@@ -32,6 +32,12 @@ const adaptiveCount = $<HTMLSelectElement>('adaptiveCount')
 const swatches = $('swatches')
 const editorSwatches = $('editorSwatches')
 const addColorBtn = $<HTMLButtonElement>('addColor')
+// 編集/アニメ用のパレット操作（白紙ユーザーもパレットを選べるように）
+const editPaletteSelect = $<HTMLSelectElement>('editPaletteSelect')
+const editAddColorBtn = $<HTMLButtonElement>('editAddColor')
+const editCustomPalette = $<HTMLTextAreaElement>('editCustomPalette')
+const editApplyCustom = $<HTMLButtonElement>('editApplyCustom')
+const editCustomStatus = $('editCustomStatus')
 const customPaletteText = $<HTMLTextAreaElement>('customPalette')
 // エディタ（レタッチ）
 const paintColorInput = $<HTMLInputElement>('paintColor')
@@ -359,13 +365,16 @@ function deleteColor(index: number): void {
 }
 
 // 現在の描く色をパレットへ追加
-addColorBtn.addEventListener('click', () => {
+// 現在の描く色をパレットへ追加（変換・編集の両ボタンから共通利用）
+function addCurrentColorToPalette(): void {
   const pal = ensureCustom()
   pal.colors.push(hexToPaletteColor(toHex(paint)))
   refreshCustomLabel()
   renderPalette(pal)
   scheduleRender()
-})
+  populateEditPaletteSelect()
+}
+addColorBtn.addEventListener('click', addCurrentColorToPalette)
 
 // --- オプション読み取り ---
 function currentDither(): DitherMode {
@@ -888,6 +897,7 @@ newBlankBtn.addEventListener('click', () => {
   const pal = activePalette()
   infoColors.textContent = `${pal.colors.length}色`
   renderPalette(pal)
+  syncEditPalette() // 編集パレット選択も追従（白紙時 endesga32 等）
   if (pal.colors.length) setPaintColor(pal.colors[0].r, pal.colors[0].g, pal.colors[0].b, 0)
 
   resetHistory()
@@ -940,15 +950,20 @@ function onControlChange(): void {
 
 paletteSelect.addEventListener('change', () => {
   updatePaletteUI()
-  if (isAdaptive()) swatches.innerHTML = '' // 生成後に render() で埋める
+  // 自動生成は画像がある時だけ render() で色を埋める。画像が無い（白紙編集）ときは
+  // 空にせずフォールバック色を表示（白紙ユーザーがパレット無しにならないように）。
+  if (isAdaptive() && sourceImage) swatches.innerHTML = ''
   else renderPalette(activePalette())
   scheduleRender()
+  syncEditPalette()
 })
 
-applyCustom.addEventListener('click', () => {
-  const pal = parsePaletteText(customPaletteText.value, '自作パレット')
+// 自作パレットのテキストを適用（変換・編集の両入力から共通利用）
+function applyCustomText(text: string, statusEl: HTMLElement | null): void {
+  const pal = parsePaletteText(text, '自作パレット')
   if (!pal) {
-    customStatus.textContent = '色が見つかりません'
+    if (statusEl) statusEl.textContent = '色が見つかりません'
+    else showToast('色が見つかりませんでした')
     return
   }
   customPal = pal
@@ -960,10 +975,36 @@ applyCustom.addEventListener('click', () => {
   }
   opt.textContent = `自作パレット (${pal.colors.length}色)`
   paletteSelect.value = '__custom'
-  customStatus.textContent = `${pal.colors.length}色を読み込みました`
+  if (statusEl) statusEl.textContent = `${pal.colors.length}色を読み込みました`
   renderPalette(pal)
   scheduleRender()
+  populateEditPaletteSelect()
+}
+applyCustom.addEventListener('click', () => applyCustomText(customPaletteText.value, customStatus))
+
+// --- 編集/アニメ用パレット選択（paletteSelect を単一の真実として経由。白紙でも選べる） ---
+function populateEditPaletteSelect(): void {
+  editPaletteSelect.innerHTML = ''
+  for (const o of Array.from(paletteSelect.options)) {
+    const c = document.createElement('option')
+    c.value = o.value
+    c.textContent = o.textContent
+    editPaletteSelect.appendChild(c)
+  }
+  editPaletteSelect.value = paletteSelect.value
+}
+function syncEditPalette(): void {
+  if (Array.from(editPaletteSelect.options).some((o) => o.value === paletteSelect.value)) {
+    editPaletteSelect.value = paletteSelect.value
+  }
+}
+editPaletteSelect.addEventListener('change', () => {
+  paletteSelect.value = editPaletteSelect.value
+  paletteSelect.dispatchEvent(new Event('change')) // 既存の変換パレット変更ロジックを再利用
 })
+editAddColorBtn.addEventListener('click', addCurrentColorToPalette)
+editApplyCustom.addEventListener('click', () => applyCustomText(editCustomPalette.value, editCustomStatus))
+populateEditPaletteSelect()
 
 exportBtn.addEventListener('click', exportPng)
 exportEditBtn.addEventListener('click', exportPng)

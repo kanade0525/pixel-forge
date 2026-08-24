@@ -373,6 +373,20 @@
                 <div id="frameStrip" class="frame-strip" role="list" aria-label="コマ一覧（タイムライン）"></div>
 
                 <div class="editor-palette" id="editorPalette">
+                  <div class="edit-pal-controls">
+                    <label class="opt" title="使う色セットを選びます（Game Boy風・PICO-8・自作 など）">パレット
+                      <select id="editPaletteSelect"></select>
+                    </label>
+                    <button id="editAddColor" type="button" title="いまの『描く色』をパレットに追加">＋色を追加</button>
+                    <details class="edit-pal-custom">
+                      <summary>自作（HEX / .gpl）</summary>
+                      <textarea id="editCustomPalette" rows="3" placeholder="#1a1c2c #5d275d … または .gpl の中身を貼付"></textarea>
+                      <div class="field-row">
+                        <button id="editApplyCustom" class="btn" type="button">適用</button>
+                        <span id="editCustomStatus" class="hint-inline"></span>
+                      </div>
+                    </details>
+                  </div>
                   <span class="editor-palette-label">パレット（クリックで描く色）</span>
                   <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
                   <span class="editor-palette-label">最近使った色</span>
