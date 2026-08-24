@@ -725,6 +725,48 @@ details summary {
 .editor-palette .swatches {
   margin: 0;
 }
+.edit-pal-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.edit-pal-controls .opt {
+  font-size: 13px;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.edit-pal-controls button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 5px 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.edit-pal-controls button:hover {
+  background: var(--surface-2);
+}
+.edit-pal-custom {
+  flex-basis: 100%;
+}
+.edit-pal-custom textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--text);
+  margin-top: 6px;
+}
 
 /* プレビュー */
 /* 入力は参照用に細く、出力（編集）を主役として広く取る */
