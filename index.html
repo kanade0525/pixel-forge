@@ -37,6 +37,45 @@
       </nav>
 
       <div class="window-pane app-pane">
+        <!-- スタート画面: 最初は2択だけ見せて混乱を防ぐ（読み込む / 一から描く） -->
+        <section id="startScreen" aria-label="はじめる">
+          <div class="start-inner">
+            <h2 class="start-title">Pixel Forge</h2>
+            <p class="start-lead">写真・イラストをきれいなドット絵に。まずはどちらか選んでください。</p>
+            <div class="start-choices">
+              <div id="startDrop" class="start-card">
+                <div class="start-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/></svg>
+                </div>
+                <div class="start-card-title">画像を読み込む</div>
+                <div class="start-card-desc">写真やイラストをドラッグ＆ドロップ、または選択してドット絵に変換します。</div>
+                <label class="btn start-card-btn">
+                  ファイルを選択
+                  <input id="startFile" type="file" accept="image/*" hidden />
+                </label>
+              </div>
+              <div class="start-card">
+                <div class="start-card-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg>
+                </div>
+                <div class="start-card-title">一から描く</div>
+                <div class="start-card-desc">白紙のキャンバスにドットを一から描きます。あとからサイズは変えられます。</div>
+                <div class="start-card-row">
+                  <label for="startSize">大きさ</label>
+                  <select id="startSize">
+                    <option value="16">16×16</option>
+                    <option value="32" selected>32×32</option>
+                    <option value="48">48×48</option>
+                    <option value="64">64×64</option>
+                  </select>
+                </div>
+                <button id="startBlank" class="btn btn-default start-card-btn" type="button">白紙から作る</button>
+              </div>
+            </div>
+            <p class="start-note">※ 迷ったら「画像を読み込む」。あとから右上の「? 使い方」でガイドも見られます。</p>
+          </div>
+        </section>
+
         <div class="app-grid">
           <!-- 左: 変換の設定 -->
           <section class="controls" id="convertControls">

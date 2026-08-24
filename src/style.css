@@ -1126,6 +1126,99 @@ canvas[aria-busy='true'] {
   color: var(--muted);
 }
 
+/* スタート画面（最初は「読み込む / 一から描く」の2択だけ表示） */
+#startScreen {
+  display: none;
+}
+body[data-stage='start'] #startScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 72vh;
+  padding: 24px 16px;
+}
+body[data-stage='start'] .window-pane > :not(#startScreen) {
+  display: none;
+}
+body[data-stage='start'] .app-tabs,
+body[data-stage='start'] .details-bar {
+  display: none;
+}
+.start-inner {
+  max-width: 760px;
+  width: 100%;
+  text-align: center;
+}
+.start-title {
+  font-size: 26px;
+  margin: 0 0 6px;
+}
+.start-lead {
+  color: var(--muted);
+  margin: 0 0 22px;
+  font-size: 14px;
+}
+.start-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .start-choices {
+    grid-template-columns: 1fr;
+  }
+}
+.start-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+#startDrop {
+  border-style: dashed;
+}
+.start-card.dragover {
+  border-color: var(--accent);
+  background: rgba(79, 107, 237, 0.06);
+}
+.start-card-icon {
+  color: var(--accent);
+  line-height: 0;
+}
+.start-card-icon svg {
+  width: 40px;
+  height: 40px;
+}
+.start-card-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+.start-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.start-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.start-card-btn {
+  margin-top: 10px;
+}
+.start-note {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 20px;
+}
+
 /* 各項目の常設「?」ヘルプ（タップで説明ポップオーバー・スマホ対応） */
 .help-toggle {
   margin-left: 6px;

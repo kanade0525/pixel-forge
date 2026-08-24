@@ -6,7 +6,7 @@ import { medianCutPalette } from './palettes/adaptive'
 import { downscale } from './downscale/downscale'
 import { quantizeImage } from './pipeline'
 import { makeZip } from './export/zip'
-import { initTour } from './tour'
+import { initTour, autoStartTour } from './tour'
 import { initHelp } from './help'
 
 // --- DOM 参照 ---
@@ -17,6 +17,11 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
 }
 
 const dropzone = $('dropzone')
+// スタート画面（最初の2択）
+const startFile = $<HTMLInputElement>('startFile')
+const startDrop = $('startDrop')
+const startBlankBtn = $<HTMLButtonElement>('startBlank')
+const startSize = $<HTMLSelectElement>('startSize')
 const fileInput = $<HTMLInputElement>('fileInput')
 const newBlankBtn = $<HTMLButtonElement>('newBlank')
 const outW = $<HTMLInputElement>('outW')
@@ -451,6 +456,7 @@ async function loadFile(file: File): Promise<void> {
     updateExportSizeLabel()
     drawSource()
     scheduleRender()
+    enterWork() // スタート画面 → 作業画面（変換）へ
   } catch (err) {
     console.error(err)
     showToast(
@@ -460,6 +466,42 @@ async function loadFile(file: File): Promise<void> {
     )
   }
 }
+
+// --- スタート画面 → 作業画面 ---
+let enteredWork = false
+function enterWork(): void {
+  document.body.dataset.stage = 'work'
+  if (!enteredWork) {
+    enteredWork = true
+    autoStartTour() // 作業画面に初めて入ったら初回ガイド（未完了時のみ・非ブロッキング）
+  }
+}
+// スタート画面: 画像を読み込む（ファイル選択／ドロップ）
+startFile.addEventListener('change', () => {
+  if (startFile.files?.[0]) void loadFile(startFile.files[0])
+})
+;['dragenter', 'dragover'].forEach((ev) =>
+  startDrop.addEventListener(ev, (e) => {
+    e.preventDefault()
+    startDrop.classList.add('dragover')
+  })
+)
+;['dragleave', 'drop'].forEach((ev) =>
+  startDrop.addEventListener(ev, (e) => {
+    e.preventDefault()
+    startDrop.classList.remove('dragover')
+  })
+)
+startDrop.addEventListener('drop', (e) => {
+  const dt = (e as DragEvent).dataTransfer
+  if (dt?.files?.[0]) void loadFile(dt.files[0])
+})
+// スタート画面: 一から描く（サイズをセットして既存の白紙作成を再利用）
+startBlankBtn.addEventListener('click', () => {
+  outW.value = startSize.value
+  outH.value = startSize.value
+  newBlankBtn.click() // 内部で setMode('edit') と enterWork() を呼ぶ
+})
 
 function drawSource(): void {
   if (!sourceImage) return
@@ -858,6 +900,7 @@ newBlankBtn.addEventListener('click', () => {
   updateFrameUI()
   edited = false
   setMode('edit') // 白紙は「描き始める」操作 → 編集タブへ着地（ペン＋パレットが揃う）
+  enterWork() // スタート画面 → 作業画面（編集）へ
   showToast(`白紙キャンバス ${w}×${h} を作成しました。編集タブで描けます`)
 })
 
@@ -2448,5 +2491,6 @@ updateUndoRedo()
 updateFrameUI()
 if (!isAdaptive()) renderPalette(activePalette())
 setMode('convert') // 初期は「変換」モード
+document.body.dataset.stage = 'start' // 最初はスタート画面（2択）だけ表示
 initTour(setMode) // 使い方ガイド（初回自動＋「? 使い方」ボタン）。操作は妨げない
 initHelp() // 各項目の常設「?」ヘルプ（タップで説明・スマホ対応）

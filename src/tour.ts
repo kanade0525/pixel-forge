@@ -259,7 +259,7 @@ function end(): void {
   launcher?.focus()
 }
 
-// 初期化: 「? 使い方」ボタンの配線＋初回自動起動
+// 初期化: 「? 使い方」ボタンの配線（自動起動は autoStartTour で作業画面に入ってから）
 export function initTour(setMode: (m: Mode) => void): void {
   gotoMode = setMode
   launcher = document.getElementById('tourStart')
@@ -267,17 +267,18 @@ export function initTour(setMode: (m: Mode) => void): void {
     if (root) end()
     else startTour()
   })
-  // 初回のみ自動起動（未操作のとき）。操作を先に始めたら自動起動しない。
-  if (!lsGet(DONE_KEY)) {
-    let cancelled = false
-    const cancel = () => {
-      cancelled = true
-    }
-    // 最初の実操作を検知したら自動起動を取りやめ（押し付けない）
-    window.addEventListener('pointerdown', cancel, { once: true, capture: true })
-    window.setTimeout(() => {
-      window.removeEventListener('pointerdown', cancel, { capture: true } as EventListenerOptions)
-      if (!cancelled && !root) startTour()
-    }, 900)
+}
+
+// 作業画面に初めて入ったとき、初回のみ自動起動（未操作なら）。スタート画面では出さない。
+export function autoStartTour(): void {
+  if (lsGet(DONE_KEY) || root) return
+  let cancelled = false
+  const cancel = () => {
+    cancelled = true
   }
+  window.addEventListener('pointerdown', cancel, { once: true, capture: true })
+  window.setTimeout(() => {
+    window.removeEventListener('pointerdown', cancel, { capture: true } as EventListenerOptions)
+    if (!cancelled && !root) startTour()
+  }, 700)
 }
