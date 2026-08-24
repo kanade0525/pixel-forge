@@ -85,12 +85,28 @@ body {
 .details-bar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   padding: 8px 20px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   color: var(--muted);
   font-size: 13px;
+}
+.tour-start {
+  margin-left: auto;
+  flex: 0 0 auto;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tour-start:hover {
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .window-pane {
@@ -992,6 +1008,122 @@ canvas[aria-busy='true'] {
   height: 1px;
   opacity: 0;
   pointer-events: none;
+}
+
+/* 使い方ガイド（ツアー）: スポットライト＋吹き出し。操作を妨げない（マスクは pointer-events:none） */
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  pointer-events: none; /* 背景は素通し＝下の要素を操作できる */
+}
+.tour-spot {
+  position: fixed;
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  outline: 2px solid var(--accent);
+  pointer-events: none;
+  transition: left 0.18s, top 0.18s, width 0.18s, height 0.18s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spot {
+    transition: none;
+  }
+}
+.tour-tip {
+  position: fixed;
+  width: min(340px, 92vw);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px 12px;
+  pointer-events: auto; /* 吹き出しだけは操作可能 */
+}
+.tour-tip--sheet {
+  left: 0 !important;
+  right: 0;
+  bottom: 0;
+  top: auto !important;
+  width: auto;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.tour-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tour-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  padding-right: 20px;
+}
+.tour-body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.tour-progress {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.tour-dots {
+  display: inline-flex;
+  gap: 5px;
+}
+.tour-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.tour-dot.on {
+  background: var(--accent);
+}
+.tour-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 6px;
+}
+.tour-actions button {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 5px 11px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.tour-actions button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.tour-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tour-actions .tour-next {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.tour-actions .tour-skip {
+  color: var(--muted);
 }
 
 /* ダークモード対応 */
