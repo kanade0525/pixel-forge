@@ -10,6 +10,14 @@
   font-style: normal;
   font-display: swap;
 }
+/* 統一アイコン Material Symbols（Apache-2.0・必要字のみsubsetを自前ホスト） */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  src: url('/fonts/MaterialSymbols.subset.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block; /* 合字ロード前に "edit" 等の英字が出ないように */
+}
 
 :root {
   --bg: #eef1f5;
@@ -24,8 +32,167 @@
   --danger: #d64545;
   --radius: 10px;
   --shadow: 0 1px 2px rgba(20, 30, 60, 0.06), 0 8px 24px rgba(20, 30, 60, 0.08);
+  /* ── デザインシステム: 単一のコントロール高さ（「ガタガタ」撲滅の要）── */
+  --control-h: 32px;
+  --control-h-lg: 40px;
+  --control-h-sm: 26px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --control-pad-x: 10px;
+  --bar-gap: 8px;
+  --group-gap: 4px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+  --fs-sm: 12px;
+  --fs-ui: 13px;
+  --fs-base: 14px;
+  --icon-sm: 16px;
+  --icon-md: 18px;
+  --icon-lg: 20px;
+  --icon-xl: 28px;
+  --hover-border: #c2c8d2;
+  --control-active-bg: #eceff3;
   /* DotGothic16 を主フォントに。読込前/未収録字はsans-serifへ（実際にはDotGothic16が全字カバー） */
   font-family: 'DotGothic16', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ── デザインシステム: バーと共通コントロール（全部同じ高さ・中央そろえ） ── */
+.bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--bar-gap);
+}
+.control {
+  height: var(--control-h);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 var(--control-pad-x);
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--fs-ui);
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.control--input {
+  justify-content: flex-start;
+  cursor: text;
+  width: 72px;
+}
+select.control {
+  padding-right: 6px;
+}
+.control:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--hover-border);
+}
+.control:active:not(:disabled) {
+  background: var(--control-active-bg);
+}
+.control:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.control--primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.control--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+.control--danger {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--surface);
+}
+.control--danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+.control--ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.control--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.control--icon {
+  width: var(--control-h);
+  padding: 0;
+}
+.control--toggle[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+.control--lg {
+  height: var(--control-h-lg);
+  padding: 0 var(--space-4);
+  font-size: var(--fs-base);
+}
+.check {
+  height: var(--control-h);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--space-2);
+  font-size: var(--fs-ui);
+  color: var(--text);
+  cursor: pointer;
+}
+.check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  margin: 0;
+}
+.icon {
+  font-family: 'Material Symbols Outlined';
+  font-weight: 400;
+  font-style: normal;
+  font-size: var(--icon-md);
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'liga';
+  flex: 0 0 auto;
+}
+.icon--sm {
+  font-size: var(--icon-sm);
+}
+.icon--lg {
+  font-size: var(--icon-lg);
+}
+.icon--xl {
+  font-size: var(--icon-xl);
+}
+.icon--rot90 {
+  transform: rotate(90deg);
 }
 
 * {
@@ -441,47 +608,6 @@ details summary {
   align-items: center;
   gap: 4px;
 }
-.tool-options button,
-.tool-actions button,
-.bg-remove button {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  padding: 5px 9px;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.tool-options button:hover,
-.tool-actions button:hover,
-.bg-remove button:hover {
-  background: var(--surface-2);
-}
-.tool-options button:disabled,
-.tool-actions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.opt-toggle.active {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-}
-/* 破壊的操作は無害なボタンと見た目を分ける（赤系） */
-#clearCanvas,
-#frameDel,
-#mapClear {
-  color: var(--danger);
-  border-color: var(--danger);
-}
-#clearCanvas:hover:not(:disabled),
-#frameDel:hover:not(:disabled),
-#mapClear:hover:not(:disabled) {
-  background: var(--danger);
-  color: #fff;
-  border-color: var(--danger);
-}
 .opt-spacer {
   flex: 1 1 auto;
   min-width: 8px;
@@ -489,34 +615,48 @@ details summary {
 .tool-actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--group-gap);
   flex-wrap: wrap;
 }
-.tool-actions #undoBtn,
-.tool-actions #redoBtn {
-  min-width: 34px;
+/* 破壊操作の色（テキストのままの frameDel/mapClear 用。clearCanvas は .control--danger）*/
+#frameDel,
+#mapClear {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+#frameDel:hover:not(:disabled),
+#mapClear:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+  border-color: var(--danger);
+}
+/* バー内の小ラベル・区切り記号 */
+.bar-label {
+  font-size: var(--fs-ui);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.bar-x {
+  color: var(--muted);
+  font-size: var(--fs-ui);
+}
+/* 色ピッカー（コントロール高さに合わせて縦位置をそろえる） */
+.paint-color {
+  height: var(--control-h);
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-}
-.tool-actions #undoBtn svg,
-.tool-actions #redoBtn svg {
-  width: 16px;
-  height: 16px;
-  display: block;
-}
-.tool-actions #exportEdit {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
-}
-.tool-actions #exportEdit:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-.tool-actions #exportEdit:disabled {
-  background: var(--surface);
+  gap: 6px;
+  font-size: var(--fs-ui);
   color: var(--text);
+}
+.paint-color input[type='color'] {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
 }
 
 /* AI生成パネル */
@@ -657,14 +797,6 @@ details summary {
   opacity: 0.4;
   cursor: not-allowed;
 }
-/* アイコン風トグル（対称描画など・正方形） */
-.icon-toggle {
-  min-width: 34px;
-  padding: 5px 8px;
-  font-size: 15px;
-  line-height: 1;
-}
-
 /* 拡大編集モーダル */
 .modal {
   position: fixed;
@@ -738,18 +870,6 @@ details summary {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-.edit-pal-controls button {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
-  border-radius: 7px;
-  padding: 5px 9px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.edit-pal-controls button:hover {
-  background: var(--surface-2);
 }
 .edit-pal-custom {
   flex-basis: 100%;
@@ -859,19 +979,6 @@ canvas[aria-busy='true'] {
   margin: 8px 0;
   flex-wrap: wrap;
 }
-.zoom-bar button {
-  min-width: 34px;
-  padding: 5px 9px;
-  font-size: 13px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.zoom-bar button:hover {
-  background: var(--surface-2);
-}
 .edit-hud {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -897,12 +1004,6 @@ canvas[aria-busy='true'] {
   }
   .tool-options {
     gap: 4px 6px;
-  }
-  .tool-options button,
-  .tool-options select,
-  .tool-actions button {
-    padding: 6px 8px;
-    font-size: 12px;
   }
 }
 
@@ -1004,10 +1105,11 @@ canvas[aria-busy='true'] {
   color: var(--muted);
 }
 #mapWrap {
-  max-height: 60vh;
+  height: min(62vh, 620px);
   overflow: auto;
-  justify-content: flex-start;
-  align-items: flex-start;
+  /* 収まるときは中央、はみ出すときは先頭に寄せてスクロール可（左寄せの大きな空白を解消） */
+  justify-content: safe center;
+  align-items: safe center;
 }
 #mapCanvas {
   image-rendering: pixelated;
@@ -1187,7 +1289,7 @@ body[data-stage='start'] .details-bar {
   display: none;
 }
 .start-inner {
-  max-width: 760px;
+  max-width: 1040px;
   width: 100%;
   text-align: center;
 }
@@ -1202,13 +1304,8 @@ body[data-stage='start'] .details-bar {
 }
 .start-choices {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 16px;
-}
-@media (max-width: 640px) {
-  .start-choices {
-    grid-template-columns: 1fr;
-  }
 }
 .start-card {
   border: 1px solid var(--border);
@@ -1231,9 +1328,11 @@ body[data-stage='start'] .details-bar {
   color: var(--accent);
   line-height: 0;
 }
-.start-card-icon svg {
-  width: 40px;
-  height: 40px;
+.start-card-icon .icon {
+  font-size: 40px;
+}
+.start-card-btn {
+  align-self: stretch;
 }
 .start-card-title {
   font-size: 16px;
@@ -1262,26 +1361,9 @@ body[data-stage='start'] .details-bar {
 }
 
 /* 各項目の常設「?」ヘルプ（タップで説明ポップオーバー・スマホ対応） */
+/* ヘルプの「?」トグルは .control--ghost --icon で高さ統一（見た目は Material help アイコン） */
 .help-toggle {
-  margin-left: 6px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  vertical-align: middle;
-  flex: 0 0 auto;
-}
-.help-toggle:hover {
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border-color: var(--accent);
+  margin-left: 2px;
 }
 .help-pop {
   position: fixed;
@@ -1319,6 +1401,8 @@ body[data-stage='start'] .details-bar {
     --accent: #6f8bff;
     --accent-hover: #8098ff;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.4);
+    --hover-border: #3f485a;
+    --control-active-bg: #2f3542;
   }
   .checker {
     background-color: #2a2f3a;
