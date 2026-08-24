@@ -40,7 +40,7 @@
         <div class="app-grid">
           <!-- 左: 変換の設定 -->
           <section class="controls" id="convertControls">
-            <h3 class="sec-title">画像を読み込む / 白紙から作る</h3>
+            <h3 class="sec-title" data-help="read">画像を読み込む / 白紙から作る</h3>
             <div id="dropzone" class="dropzone">
               <p>画像をドラッグ＆ドロップ</p>
               <label class="btn">
@@ -68,7 +68,7 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">出力サイズ（ドットの粗さ）</h3>
+            <h3 class="sec-title" data-help="size">出力サイズ（ドットの粗さ）</h3>
             <p class="help">小さいほど粗くレトロに。目安：タイル16・キャラ32〜64。</p>
             <div class="field-row">
               <label for="outW">幅</label>
@@ -87,7 +87,7 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">パレット（使う色）</h3>
+            <h3 class="sec-title" data-help="palette">パレット（使う色）</h3>
             <p class="help">この色だけで描き直します。迷ったら「画像から自動生成」。</p>
             <div class="field-row">
               <select
@@ -135,7 +135,7 @@
             </details>
 
             <hr class="separator" />
-            <h3 class="sec-title">色の混ぜ方（ディザリング）</h3>
+            <h3 class="sec-title" data-help="dither">色の混ぜ方（ディザリング）</h3>
             <p class="help">少ない色で階調を表現。小さいドット絵は「なし」が基本。</p>
             <div class="field-row dither-row">
               <input type="radio" id="dither-none" name="dither" value="none" checked />
@@ -167,7 +167,7 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">詳細設定</h3>
+            <h3 class="sec-title" data-help="detail">詳細設定</h3>
             <div class="field-row">
               <label for="downscale" title="画像を小さくする際の縮め方">縮め方</label>
               <select id="downscale">
@@ -184,7 +184,7 @@
             </div>
 
             <hr class="separator" />
-            <h3 class="sec-title">書き出し（PNG保存）</h3>
+            <h3 class="sec-title" data-help="exportpng">書き出し（PNG保存）</h3>
             <p class="help">SNS表示は×8前後、素材の原寸は×1。</p>
             <div class="field-row">
               <label for="exportScale" title="保存するPNGを何倍に拡大するか。原寸(×1)はドット数そのまま。">拡大率</label>
@@ -276,12 +276,12 @@
                     </div>
 
                     <div class="zoom-bar" id="zoomBar">
-                      <span class="tb-label">表示</span>
+                      <span class="tb-label" data-help="zoom">表示</span>
                       <button id="zoomOut" title="縮小 ( - )">－</button>
                       <button id="zoomFit" title="全体を表示 ( 0 )">フィット</button>
                       <button id="zoomIn" title="拡大 ( + )">＋</button>
                       <span id="editHud" class="edit-hud" aria-live="polite"></span>
-                      <span class="opt bg-remove" title="仕上げの背景消し。輪郭を整えるなら変換タブの元画像側が推奨">
+                      <span class="opt bg-remove" data-help="bgremove" title="仕上げの背景消し。輪郭を整えるなら変換タブの元画像側が推奨">
                         背景消し
                         <button id="bgEdges" title="ドット絵のフチから続く背景を透明に">フチから</button>
                         <button id="bgColor" title="『描く色』に近い色をすべて透明に">この色を</button>
@@ -297,7 +297,7 @@
                 </div>
 
                 <div class="frame-bar" id="frameBar" title="アニメのコマ（フレーム）を複数持てます">
-                  <div class="tool-group">
+                  <div class="tool-group" data-help="frames">
                     <button id="framePrev" title="前のコマへ" disabled>前へ</button>
                     <span id="frameLabel" class="frame-label" title="現在のコマ / 全コマ数">1 / 1</span>
                     <button id="frameNext" title="次のコマへ" disabled>次へ</button>
@@ -307,7 +307,7 @@
                     <button id="frameBlank" title="空っぽのコマを追加" disabled>空コマ追加</button>
                     <button id="frameDel" title="このコマを削除" disabled>コマ削除</button>
                   </div>
-                  <label class="grid-toggle" title="編集の下に参照画像を薄く敷いて“なぞり描き”できます。『元画像』＝アップした写真、『前のコマ』＝直前フレーム。空コマと合わせると、元画像を1pxずらして描き直す等が可能。">
+                  <label class="grid-toggle" data-help="refimg" title="編集の下に参照画像を薄く敷いて“なぞり描き”できます。『元画像』＝アップした写真、『前のコマ』＝直前フレーム。空コマと合わせると、元画像を1pxずらして描き直す等が可能。">
                     透かし（下絵）
                     <select id="refMode">
                       <option value="none" selected>なし</option>
@@ -324,7 +324,7 @@
                       FPS <input id="fpsInput" type="number" min="1" max="30" value="8" style="width:56px" />
                     </label>
                   </div>
-                  <div class="tool-group">
+                  <div class="tool-group" data-help="animexport">
                     <button id="addImages" title="複数の画像をまとめてコマとして追加（アニメ素材の読み込み）">画像を複数追加</button>
                     <input id="addImagesInput" type="file" accept="image/*" multiple hidden />
                     <button id="sheetExport" title="全コマを横1列に並べた1枚のPNGとして保存（ゲームのアニメ素材向け）" disabled>コマを並べて保存</button>
@@ -341,7 +341,7 @@
                 </div>
 
                 <details class="ai-panel" id="aiPanel">
-                  <summary title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">AIで下絵を作る（β・Gemini）</summary>
+                  <summary data-help="ai" title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">AIで下絵を作る（β・Gemini）</summary>
                   <div class="ai-body">
                     <textarea id="aiPrompt" rows="2" placeholder="例：剣を持ったドット絵の勇者、正面向き、背景は無地"></textarea>
                     <div class="field-row">
@@ -376,7 +376,7 @@
             </dl>
 
             <section class="tilemap-panel" id="tilemapPanel">
-              <h3 class="sec-title">タイルマップ（タイルを並べて地図・シーンを作る）</h3>
+              <h3 class="sec-title" data-help="tilemap">タイルマップ（タイルを並べて地図・シーンを作る）</h3>
               <p class="help">
                 描いた「コマ」をタイルとして格子に並べ、大きな絵（マップ）を作れます。下でタイルを選び、マップをクリック/ドラッグで配置。右クリックで消去。
                 ※コマ（フレーム）を増やすと、そのぶんタイルの種類が増えます。
