@@ -9,6 +9,10 @@
   — SIL Open Font License 1.1（OFL）で配布。商用利用可。ライセンス全文は
   `public/fonts/OFL.txt` に同梱。フォーマットを woff2 に変換して自前ホストしています
   （字形の改変はしていません）。
+- **Material Symbols Outlined**（© Google）
+  — Apache License 2.0 で配布。商用利用可。ライセンス全文は
+  `public/fonts/LICENSE-MaterialSymbols.txt` に同梱。可変軸を静的化し、使用アイコンのみ
+  subset して woff2 で自前ホスト（`public/fonts/MaterialSymbols.subset.woff2`）。
 
 ## パレット配色のクレジット
 

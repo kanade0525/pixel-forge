@@ -44,35 +44,41 @@
             <p class="start-lead">写真・イラストをきれいなドット絵に。まずはどちらか選んでください。</p>
             <div class="start-choices">
               <div id="startDrop" class="start-card">
-                <div class="start-card-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/></svg>
-                </div>
+                <div class="start-card-icon" aria-hidden="true"><span class="icon icon--xl">upload</span></div>
                 <div class="start-card-title">画像を読み込む</div>
                 <div class="start-card-desc">写真やイラストをドラッグ＆ドロップ、または選択してドット絵に変換します。</div>
-                <label class="btn start-card-btn">
+                <label class="control control--primary start-card-btn">
                   ファイルを選択
                   <input id="startFile" type="file" accept="image/*" hidden />
                 </label>
               </div>
               <div class="start-card">
-                <div class="start-card-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4L16 5l3 3L8 19l-4 1z"/><path d="M14 7l3 3"/></svg>
-                </div>
+                <div class="start-card-icon" aria-hidden="true"><span class="icon icon--xl">draw</span></div>
                 <div class="start-card-title">一から描く</div>
                 <div class="start-card-desc">白紙のキャンバスにドットを一から描きます。あとからサイズは変えられます。</div>
                 <div class="start-card-row">
                   <label for="startSize">大きさ</label>
-                  <select id="startSize">
+                  <select id="startSize" class="control">
                     <option value="16">16×16</option>
                     <option value="32" selected>32×32</option>
                     <option value="48">48×48</option>
                     <option value="64">64×64</option>
                   </select>
                 </div>
-                <button id="startBlank" class="btn btn-default start-card-btn" type="button">白紙から作る</button>
+                <button id="startBlank" class="control start-card-btn" type="button">白紙から作る</button>
+              </div>
+              <div class="start-card">
+                <div class="start-card-icon" aria-hidden="true"><span class="icon icon--xl">grid_view</span></div>
+                <div class="start-card-title">タイルを並べて地図を作る</div>
+                <div class="start-card-desc">複数の画像をタイルとして取り込み、格子に並べて大きな地図・シーンを作ります。</div>
+                <label class="control control--primary start-card-btn">
+                  画像をタイルに取り込む
+                  <input id="startTiles" type="file" accept="image/*" multiple hidden />
+                </label>
+                <button id="startTilesBlank" class="link-btn" type="button">空のマスから始める</button>
               </div>
             </div>
-            <p class="start-note">※ 迷ったら「画像を読み込む」。あとから右上の「? 使い方」でガイドも見られます。</p>
+            <p class="start-note">※ 迷ったら「画像を読み込む」。あとから右上の「使い方」でガイドも見られます。</p>
           </div>
         </section>
 
@@ -258,79 +264,83 @@
                 <div class="editor-stage" id="editorStage">
                   <!-- 左：アイコンのツール列（Aseprite/Piskel風） -->
                   <div class="tool-rail" id="toolRail" role="toolbar" aria-label="ツール">
-                    <button class="tool active" data-tool="pencil" title="ペン (B)" aria-label="ペン">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l.7-2.8L13 5l2 2-9.3 9.3L3 17z"/><path d="M12 6l2 2"/></svg>
-                    </button>
-                    <button class="tool" data-tool="eraser" title="消しゴム (E)" aria-label="消しゴム">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 16h8"/><rect x="3.5" y="8" width="9" height="6" rx="1.2" transform="rotate(-45 8 11)"/></svg>
-                    </button>
-                    <button class="tool" data-tool="bucket" title="塗りつぶし (G)" aria-label="塗りつぶし">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10l6-6 6 6-6 6z"/><path d="M16 12c1.2 1.3 1.2 3 0 3s-1.2-1.7 0-3z" fill="currentColor"/></svg>
-                    </button>
-                    <button class="tool" data-tool="eyedropper" title="スポイト (I)" aria-label="スポイト">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l1-3 8-8 2 2-8 8-3 1z"/><path d="M12 4l4 4"/></svg>
-                    </button>
-                    <button class="tool" data-tool="line" title="直線：ドラッグで始点→終点 (L)" aria-label="直線">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="16" x2="16" y2="4"/></svg>
-                    </button>
-                    <button class="tool" data-tool="rect" title="四角の枠：ドラッグ (R)" aria-label="四角">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="5" width="12" height="10" rx="1"/></svg>
-                    </button>
-                    <button class="tool" data-tool="pan" title="手のひら：表示を移動（スペース＋ドラッグ／2本指でも可）(H)" aria-label="手のひら">
-                      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v14M3 10h14"/><path d="M8 5l2-2 2 2M8 15l2 2 2-2M5 8l-2 2 2 2M15 8l2 2-2 2"/></svg>
-                    </button>
+                    <button class="tool active" data-tool="pencil" title="ペン (B)" aria-label="ペン"><span class="icon icon--lg">edit</span></button>
+                    <button class="tool" data-tool="eraser" title="消しゴム (E)" aria-label="消しゴム"><span class="icon icon--lg">ink_eraser</span></button>
+                    <button class="tool" data-tool="bucket" title="塗りつぶし (G)" aria-label="塗りつぶし"><span class="icon icon--lg">format_color_fill</span></button>
+                    <button class="tool" data-tool="eyedropper" title="スポイト (I)" aria-label="スポイト"><span class="icon icon--lg">colorize</span></button>
+                    <button class="tool" data-tool="line" title="直線：ドラッグで始点→終点 (L)" aria-label="直線"><span class="icon icon--lg">pen_size_2</span></button>
+                    <button class="tool" data-tool="rect" title="四角の枠：ドラッグ (R)" aria-label="四角"><span class="icon icon--lg">crop_square</span></button>
+                    <button class="tool" data-tool="pan" title="手のひら：表示を移動（スペース＋ドラッグ／2本指でも可）(H)" aria-label="手のひら"><span class="icon icon--lg">pan_tool</span></button>
                   </div>
 
                   <!-- 右：オプションバー＋キャンバス＋表示バー -->
                   <div class="stage-main">
-                    <div class="tool-options" id="toolOptions">
-                      <label class="paint-color" title="描く色（ペン・塗りつぶし・図形で使用）">
-                        色 <input id="paintColor" type="color" value="#000000" />
-                      </label>
-                      <label class="opt" title="ペン・直線・四角の太さ（[ ] キーでも増減）">太さ
-                        <select id="brushSize">
-                          <option value="1" selected>1px</option>
-                          <option value="2">2px</option>
-                          <option value="3">3px</option>
-                          <option value="4">4px</option>
-                        </select>
-                      </label>
-                      <button id="mirrorX" class="opt-toggle icon-toggle" title="左右対称に同時に描く" aria-label="左右対称">⇄</button>
-                      <button id="mirrorY" class="opt-toggle icon-toggle" title="上下対称に同時に描く" aria-label="上下対称">⇅</button>
-                      <label class="opt" title="ドットの境目にグリッド線を表示（位置合わせに便利）"><input id="gridToggle" type="checkbox" checked /> グリッド</label>
+                    <div class="tool-options bar" id="toolOptions">
+                      <label class="paint-color" title="描く色（ペン・塗りつぶし・図形で使用）">色 <input id="paintColor" type="color" value="#000000" /></label>
+                      <span class="bar-label">太さ</span>
+                      <select id="brushSize" class="control" title="ペン・直線・四角の太さ（[ ] キーでも増減）">
+                        <option value="1" selected>1px</option>
+                        <option value="2">2px</option>
+                        <option value="3">3px</option>
+                        <option value="4">4px</option>
+                      </select>
+                      <button id="mirrorX" class="control control--toggle" type="button" aria-pressed="false" title="左右対称に同時に描く"><span class="icon">flip</span>左右対称</button>
+                      <button id="mirrorY" class="control control--toggle" type="button" aria-pressed="false" title="上下対称に同時に描く"><span class="icon icon--rot90">flip</span>上下対称</button>
+                      <label class="check" title="ドットの境目にグリッド線を表示（位置合わせに便利）"><input id="gridToggle" type="checkbox" checked /><span class="icon">grid_on</span>グリッド</label>
+                      <span class="bar-label" title="キャンバスの大きさ（ドット数）を後から変更。内容は中央を保って拡張／切り抜きします">サイズ</span>
+                      <input id="canvasW" class="control control--input" type="number" min="1" max="512" style="width:56px" aria-label="幅(ドット)" />
+                      <span class="bar-x">×</span>
+                      <input id="canvasH" class="control control--input" type="number" min="1" max="512" style="width:56px" aria-label="高さ(ドット)" />
+                      <button id="applyCanvasSize" class="control" type="button">変更</button>
+                      <span class="bar-label" data-help="bgremove">背景消し</span>
+                      <button id="bgEdges" class="control" type="button" title="ドット絵のフチから続く背景を透明に">フチから</button>
+                      <button id="bgColor" class="control" type="button" title="『描く色』に近い色をすべて透明に">この色を</button>
+                      <select id="bgTol" class="control" title="どこまで近い色を背景とみなすか">
+                        <option value="24">弱</option>
+                        <option value="48" selected>中</option>
+                        <option value="90">強</option>
+                      </select>
                       <span class="opt-spacer"></span>
-                      <div class="tool-actions" aria-label="操作">
-                        <button id="undoBtn" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 8h6a4 4 0 0 1 0 8H6"/><path d="M7 8L4.5 5.5M7 8l-2.5 2.5"/></svg></button>
-                        <button id="redoBtn" title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H7a4 4 0 0 0 0 8h7"/><path d="M13 8l2.5-2.5M13 8l2.5 2.5"/></svg></button>
-                        <button id="flipH" title="左右反転（向き違いのスプライト作成に）" disabled>左右反転</button>
-                        <button id="flipV" title="上下反転" disabled>上下反転</button>
-                        <button id="clearCanvas" title="キャンバスを全部消して透明にします">全消去</button>
-                        <button id="exportEdit" class="btn-default" title="このコマをPNGで保存（拡大率は変換タブの設定）" disabled>PNGを保存</button>
+                      <div class="tool-actions bar" aria-label="操作">
+                        <button id="undoBtn" class="control control--icon" type="button" title="元に戻す (Ctrl+Z)" aria-label="元に戻す" disabled><span class="icon icon--sm">undo</span></button>
+                        <button id="redoBtn" class="control control--icon" type="button" title="やり直し (Ctrl+Y)" aria-label="やり直し" disabled><span class="icon icon--sm">redo</span></button>
+                        <button id="flipH" class="control" type="button" title="左右反転（向き違いのスプライト作成に）" disabled><span class="icon">flip</span>左右反転</button>
+                        <button id="flipV" class="control" type="button" title="上下反転" disabled><span class="icon icon--rot90">flip</span>上下反転</button>
+                        <button id="clearCanvas" class="control control--danger" type="button" title="キャンバスを全部消して透明にします"><span class="icon">delete</span>全消去</button>
+                        <button id="exportEdit" class="control control--primary" type="button" title="このコマをPNGで保存（拡大率は変換タブの設定）" disabled><span class="icon">download</span>保存</button>
                       </div>
                     </div>
 
-                    <div class="canvas-wrap checker" id="canvasWrap">
+                    <div class="editor-palette" id="editorPalette">
+                      <div class="edit-pal-controls bar">
+                        <span class="bar-label">パレット</span>
+                        <select id="editPaletteSelect" class="control" title="使う色セット（Game Boy風・PICO-8・自作 など）"></select>
+                        <button id="editAddColor" class="control" type="button" title="いまの『描く色』をパレットに追加"><span class="icon icon--sm">add</span>色を追加</button>
+                        <details class="edit-pal-custom">
+                          <summary>自作（HEX / .gpl）</summary>
+                          <textarea id="editCustomPalette" rows="3" placeholder="#1a1c2c #5d275d … または .gpl の中身を貼付"></textarea>
+                          <div class="field-row">
+                            <button id="editApplyCustom" class="control" type="button">適用</button>
+                            <span id="editCustomStatus" class="hint-inline"></span>
+                          </div>
+                        </details>
+                      </div>
+                      <div id="editorSwatches" class="swatches" role="list" aria-label="描く色（クリックで選択）"></div>
+                      <span class="editor-palette-label">最近使った色</span>
+                      <div id="recentSwatches" class="swatches" role="list" aria-label="最近使った色"></div>
+                    </div>
+
+                    <div class="canvas-wrap" id="canvasWrap">
                       <canvas id="outCanvas" aria-label="ドット絵キャンバス（ドラッグで描画・スペース＋ドラッグで移動）"></canvas>
                       <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>
                     </div>
 
-                    <div class="zoom-bar" id="zoomBar">
-                      <span class="tb-label" data-help="zoom">表示</span>
-                      <button id="zoomOut" title="縮小 ( - )">－</button>
-                      <button id="zoomFit" title="全体を表示 ( 0 )">フィット</button>
-                      <button id="zoomIn" title="拡大 ( + )">＋</button>
+                    <div class="zoom-bar bar" id="zoomBar">
+                      <span class="bar-label" data-help="zoom">表示</span>
+                      <button id="zoomOut" class="control control--icon" type="button" title="縮小 ( - )" aria-label="縮小"><span class="icon">zoom_out</span></button>
+                      <button id="zoomFit" class="control" type="button" title="全体を表示 ( 0 )"><span class="icon">fit_screen</span>フィット</button>
+                      <button id="zoomIn" class="control control--icon" type="button" title="拡大 ( + )" aria-label="拡大"><span class="icon">zoom_in</span></button>
                       <span id="editHud" class="edit-hud" aria-live="polite"></span>
-                      <span class="opt bg-remove" data-help="bgremove" title="仕上げの背景消し。輪郭を整えるなら変換タブの元画像側が推奨">
-                        背景消し
-                        <button id="bgEdges" title="ドット絵のフチから続く背景を透明に">フチから</button>
-                        <button id="bgColor" title="『描く色』に近い色をすべて透明に">この色を</button>
-                        <select id="bgTol" title="どこまで近い色を背景とみなすか">
-                          <option value="24">弱</option>
-                          <option value="48" selected>中</option>
-                          <option value="90">強</option>
-                        </select>
-                      </span>
-                      <span class="hint-inline">ホイール/ピンチで拡大・スペース＋ドラッグで移動</span>
                     </div>
                   </div>
                 </div>
@@ -371,27 +381,6 @@
                   </div>
                 </div>
                 <div id="frameStrip" class="frame-strip" role="list" aria-label="コマ一覧（タイムライン）"></div>
-
-                <div class="editor-palette" id="editorPalette">
-                  <div class="edit-pal-controls">
-                    <label class="opt" title="使う色セットを選びます（Game Boy風・PICO-8・自作 など）">パレット
-                      <select id="editPaletteSelect"></select>
-                    </label>
-                    <button id="editAddColor" type="button" title="いまの『描く色』をパレットに追加">＋色を追加</button>
-                    <details class="edit-pal-custom">
-                      <summary>自作（HEX / .gpl）</summary>
-                      <textarea id="editCustomPalette" rows="3" placeholder="#1a1c2c #5d275d … または .gpl の中身を貼付"></textarea>
-                      <div class="field-row">
-                        <button id="editApplyCustom" class="btn" type="button">適用</button>
-                        <span id="editCustomStatus" class="hint-inline"></span>
-                      </div>
-                    </details>
-                  </div>
-                  <span class="editor-palette-label">パレット（クリックで描く色）</span>
-                  <div id="editorSwatches" class="swatches" role="list" aria-label="描く色の候補"></div>
-                  <span class="editor-palette-label">最近使った色</span>
-                  <div id="recentSwatches" class="swatches" role="list" aria-label="最近使った色"></div>
-                </div>
 
                 <details class="ai-panel" id="aiPanel">
                   <summary data-help="ai" title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">AIで下絵を作る（β・Gemini）</summary>
@@ -444,7 +433,7 @@
               </div>
               <span class="editor-palette-label">タイルを選ぶ（右クリックで配置消去）</span>
               <div id="tilePicker" class="tile-picker" role="list" aria-label="タイル一覧"></div>
-              <div class="canvas-wrap checker" id="mapWrap">
+              <div class="canvas-wrap" id="mapWrap">
                 <canvas id="mapCanvas" aria-label="タイルマップ（クリック/ドラッグで配置）"></canvas>
                 <p id="mapEmpty" class="empty-state">先にタイルを用意しましょう：「アニメ」タブで「コマを複製／空コマ追加」、または「変換」タブで1枚作るとタイルになります</p>
               </div>

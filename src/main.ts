@@ -22,6 +22,8 @@ const startFile = $<HTMLInputElement>('startFile')
 const startDrop = $('startDrop')
 const startBlankBtn = $<HTMLButtonElement>('startBlank')
 const startSize = $<HTMLSelectElement>('startSize')
+const startTiles = $<HTMLInputElement>('startTiles')
+const startTilesBlankBtn = $<HTMLButtonElement>('startTilesBlank')
 const fileInput = $<HTMLInputElement>('fileInput')
 const newBlankBtn = $<HTMLButtonElement>('newBlank')
 const outW = $<HTMLInputElement>('outW')
@@ -48,6 +50,9 @@ const redoBtn = $<HTMLButtonElement>('redoBtn')
 const flipHBtn = $<HTMLButtonElement>('flipH')
 const flipVBtn = $<HTMLButtonElement>('flipV')
 const gridToggle = $<HTMLInputElement>('gridToggle')
+const canvasWInput = $<HTMLInputElement>('canvasW')
+const canvasHInput = $<HTMLInputElement>('canvasH')
+const applyCanvasSizeBtn = $<HTMLButtonElement>('applyCanvasSize')
 const bgEdgesBtn = $<HTMLButtonElement>('bgEdges')
 const bgColorBtn = $<HTMLButtonElement>('bgColor')
 const bgTol = $<HTMLSelectElement>('bgTol')
@@ -511,6 +516,25 @@ startBlankBtn.addEventListener('click', () => {
   outH.value = startSize.value
   newBlankBtn.click() // 内部で setMode('edit') と enterWork() を呼ぶ
 })
+// スタート画面: タイルを並べて地図を作る（第3のユーザーストーリー）
+startTiles.addEventListener('change', () => {
+  const files = startTiles.files
+  if (files && files.length) {
+    outW.value = '32' // 取り込むタイルの既定サイズ
+    outH.value = '32'
+    void addImagesAsFrames(Array.from(files)).then(() => {
+      enterWork()
+      setMode('tilemap')
+    })
+  }
+  startTiles.value = ''
+})
+startTilesBlankBtn.addEventListener('click', () => {
+  outW.value = '32'
+  outH.value = '32'
+  newBlankBtn.click() // 白紙1コマ作成（enterWork＋edit）
+  setMode('tilemap') // タイルマップへ切替（空のマスから）
+})
 
 function drawSource(): void {
   if (!sourceImage) return
@@ -672,16 +696,78 @@ function computeView(): void {
     panY = clampPan(panY, vh, lastResult.height * currentZoom)
   }
 }
+// 低倍率用の固定チェッカーパターン（テーマ別にキャッシュ）
+let checkerPattern: CanvasPattern | null = null
+let checkerPatternDark = false
+function getCheckerPattern(ctx: CanvasRenderingContext2D, dark: boolean): CanvasPattern | null {
+  if (checkerPattern && checkerPatternDark === dark) return checkerPattern
+  const t = document.createElement('canvas')
+  t.width = 16
+  t.height = 16
+  const tc = t.getContext('2d')!
+  tc.fillStyle = dark ? '#2a2f3a' : '#ffffff'
+  tc.fillRect(0, 0, 16, 16)
+  tc.fillStyle = dark ? '#353c4a' : '#dfe3ea'
+  tc.fillRect(0, 0, 8, 8)
+  tc.fillRect(8, 8, 8, 8)
+  checkerPattern = ctx.createPattern(t, 'repeat')
+  checkerPatternDark = dark
+  return checkerPattern
+}
+// 透過チェッカー。zoom>=4 は 1ドット=1マス（グリッドと完全一致）、低倍率は固定パターン。
+function drawCheckerboard(
+  ctx: CanvasRenderingContext2D,
+  x0: number,
+  y0: number,
+  iw: number,
+  ih: number,
+  zoom: number
+): void {
+  if (!lastResult) return
+  const dark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  const cA = dark ? '#2a2f3a' : '#ffffff'
+  const cB = dark ? '#353c4a' : '#dfe3ea'
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(x0, y0, iw, ih)
+  ctx.clip()
+  if (zoom >= 4) {
+    // 1ドット=1マス。グリッド線がマスの境界に必ず一致する（干渉しない）。可視範囲のみ描画。
+    const w = lastResult.width
+    const h = lastResult.height
+    const cw = outCanvas.width
+    const ch = outCanvas.height
+    const xs = Math.max(0, Math.floor((0 - x0) / zoom))
+    const xe = Math.min(w, Math.ceil((cw - x0) / zoom))
+    const ys = Math.max(0, Math.floor((0 - y0) / zoom))
+    const ye = Math.min(h, Math.ceil((ch - y0) / zoom))
+    for (let y = ys; y < ye; y++) {
+      for (let x = xs; x < xe; x++) {
+        ctx.fillStyle = (x + y) & 1 ? cB : cA
+        ctx.fillRect(Math.floor(x0 + x * zoom), Math.floor(y0 + y * zoom), Math.ceil(zoom), Math.ceil(zoom))
+      }
+    }
+  } else {
+    // 低倍率はグリッド非表示なので固定チェッカーでOK（1回のfillで軽量）
+    const pat = getCheckerPattern(ctx, dark)
+    ctx.fillStyle = pat ?? cA
+    ctx.fillRect(x0, y0, iw, ih)
+  }
+  ctx.restore()
+}
+
 function drawOutput(): void {
   if (!lastResult) return
   sizeViewport()
   computeView()
   const ctx = outCanvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
-  ctx.clearRect(0, 0, outCanvas.width, outCanvas.height) // 透明クリア→枠のチェッカーが透ける
+  ctx.clearRect(0, 0, outCanvas.width, outCanvas.height)
   const z = currentZoom
   const iw = lastResult.width * z
   const ih = lastResult.height * z
+  // 透過チェッカーをキャンバス上に描く（グリッド＝1ドットと基準/位置を完全一致させ、干渉を防ぐ）
+  drawCheckerboard(ctx, panX, panY, iw, ih, z)
   // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。（再生中は出さない）
   const rm = playing ? 'none' : refMode.value
   const alpha = Number(onionOpacity.value)
@@ -1389,9 +1475,12 @@ outCanvas.addEventListener(
   'wheel',
   (e) => {
     if (!lastResult || !canPaint()) return
+    // 拡大はトラックパッドのピンチ（ctrlKey付き）または Ctrl/Cmd+ホイールのみ。
+    // 通常の2本指/ホイールスクロールは素通しさせ、ページスクロールを奪わない（Mac対策）。
+    if (!e.ctrlKey && !e.metaKey) return
     e.preventDefault()
     const rect = outCanvas.getBoundingClientRect()
-    setZoom(currentZoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX - rect.left, e.clientY - rect.top)
+    setZoom(currentZoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - rect.left, e.clientY - rect.top)
   },
   { passive: false }
 )
@@ -1472,11 +1561,11 @@ brushSizeSel.addEventListener('change', () => setBrush(Number(brushSizeSel.value
 // ミラー（対称描画）
 mirrorXBtn.addEventListener('click', () => {
   mirrorX = !mirrorX
-  mirrorXBtn.classList.toggle('active', mirrorX)
+  mirrorXBtn.setAttribute('aria-pressed', String(mirrorX))
 })
 mirrorYBtn.addEventListener('click', () => {
   mirrorY = !mirrorY
-  mirrorYBtn.classList.toggle('active', mirrorY)
+  mirrorYBtn.setAttribute('aria-pressed', String(mirrorY))
 })
 // 全消去
 clearCanvasBtn.addEventListener('click', () => {
@@ -1486,6 +1575,60 @@ clearCanvasBtn.addEventListener('click', () => {
   lastResult.data.fill(0)
   drawOutput()
 })
+// --- キャンバスサイズ変更（後からドット数を変える。内容は中央維持で拡張/切り抜き） ---
+function syncCanvasSizeInputs(): void {
+  if (!lastResult) return
+  canvasWInput.value = String(lastResult.width)
+  canvasHInput.value = String(lastResult.height)
+}
+function resizeAllFrames(nw: number, nh: number): void {
+  const ow = frames[0].width
+  const oh = frames[0].height
+  const offX = Math.round((nw - ow) / 2)
+  const offY = Math.round((nh - oh) / 2)
+  frames = frames.map((f) => {
+    const nd = new Uint8ClampedArray(nw * nh * 4)
+    for (let y = 0; y < oh; y++) {
+      const ny = y + offY
+      if (ny < 0 || ny >= nh) continue
+      for (let x = 0; x < ow; x++) {
+        const nx = x + offX
+        if (nx < 0 || nx >= nw) continue
+        const si = (y * ow + x) * 4
+        const di = (ny * nw + nx) * 4
+        nd[di] = f.data[si]
+        nd[di + 1] = f.data[si + 1]
+        nd[di + 2] = f.data[si + 2]
+        nd[di + 3] = f.data[si + 3]
+      }
+    }
+    return { width: nw, height: nh, data: nd }
+  })
+  currentFrame = Math.min(currentFrame, frames.length - 1)
+  lastResult = frames[currentFrame]
+}
+applyCanvasSizeBtn.addEventListener('click', () => {
+  if (!lastResult || frames.length === 0) return
+  const nw = clampInt(canvasWInput.value, 1, 512, lastResult.width)
+  const nh = clampInt(canvasHInput.value, 1, 512, lastResult.height)
+  if (nw === lastResult.width && nh === lastResult.height) return
+  if (
+    (nw < lastResult.width || nh < lastResult.height) &&
+    !window.confirm('小さくすると、はみ出した部分は切り取られます。よろしいですか？')
+  ) {
+    syncCanvasSizeInputs()
+    return
+  }
+  resizeAllFrames(nw, nh)
+  edited = true
+  viewZoom = 0
+  resetHistory()
+  outLabel.textContent = `${nw}×${nh}`
+  drawOutput()
+  updateFrameUI()
+  showToast(`キャンバスサイズを ${nw}×${nh} に変更しました`)
+})
+
 // ズーム操作
 zoomInBtn.addEventListener('click', () => zoomBy(1.25))
 zoomOutBtn.addEventListener('click', () => zoomBy(1 / 1.25))
@@ -1780,6 +1923,7 @@ function updateFrameUI(): void {
     mapExportBtn.disabled = !tileDims()
   }
   updateOutputAffordances()
+  syncCanvasSizeInputs()
 }
 
 framePrev.addEventListener('click', () => gotoFrame(currentFrame - 1))
@@ -2333,6 +2477,16 @@ function drawMap(): void {
   const ctx = mapCanvas.getContext('2d')!
   ctx.imageSmoothingEnabled = false
   ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height)
+  // 透過チェッカーをセルに整列させて描く（CSS固定16pxとの不整合を解消・グリッドと一致）
+  const dark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  const cA = dark ? '#2a2f3a' : '#ffffff'
+  const cB = dark ? '#353c4a' : '#dfe3ea'
+  for (let r = 0; r < mapRows; r++) {
+    for (let c = 0; c < mapCols; c++) {
+      ctx.fillStyle = (c + r) & 1 ? cB : cA
+      ctx.fillRect(c * cw, r * ch, cw, ch)
+    }
+  }
   for (let r = 0; r < mapRows; r++) {
     for (let c = 0; c < mapCols; c++) {
       const t = mapData[r * mapCols + c]
@@ -2341,7 +2495,7 @@ function drawMap(): void {
       }
     }
   }
-  ctx.strokeStyle = 'rgba(128,128,128,0.35)'
+  ctx.strokeStyle = 'rgba(128,128,128,0.55)'
   ctx.lineWidth = 1
   ctx.beginPath()
   for (let c = 0; c <= mapCols; c++) {

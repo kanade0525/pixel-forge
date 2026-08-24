@@ -77,7 +77,7 @@ function closePop(): void {
 
 function onDocDown(e: Event): void {
   const t = e.target as HTMLElement
-  if (openPop && !openPop.contains(t) && !t.classList?.contains('help-toggle')) closePop()
+  if (openPop && !openPop.contains(t) && !t.closest?.('.help-toggle')) closePop()
 }
 function onKeyDown(e: KeyboardEvent): void {
   if (e.key === 'Escape') closePop()
@@ -107,8 +107,8 @@ export function initHelp(): void {
     if (!h) return
     const btn = document.createElement('button')
     btn.type = 'button'
-    btn.className = 'help-toggle'
-    btn.textContent = '?'
+    btn.className = 'control control--ghost control--icon help-toggle'
+    btn.innerHTML = '<span class="icon icon--sm">help</span>'
     btn.setAttribute('aria-label', `${h.title}の説明`)
     btn.addEventListener('click', (e) => {
       e.stopPropagation()
