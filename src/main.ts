@@ -1810,7 +1810,7 @@ function stopPlay(): void {
   playing = false
   currentFrame = Math.min(playSavedFrame, frames.length - 1)
   lastResult = frames[currentFrame]
-  playBtn.textContent = '▶ 再生'
+  playBtn.textContent = '再生'
   drawOutput()
   updateFrameUI()
 }
@@ -1818,7 +1818,7 @@ function startPlay(): void {
   if (frames.length < 2) return
   playSavedFrame = currentFrame
   playing = true
-  playBtn.textContent = '■ 停止'
+  playBtn.textContent = '停止'
   const fps = Math.max(1, Math.min(30, Number(fpsInput.value) || 8))
   let i = 0
   playTimer = window.setInterval(() => {

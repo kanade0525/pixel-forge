@@ -1,5 +1,16 @@
 /* Pixel Forge — 自前のクリーンなデザイン（外部フレームワーク非依存） */
 
+/* ピクセル風フォント DotGothic16（OFL・自前ホスト）。
+   日本語（仮名・漢字）＋英数字＋主要記号を網羅した本格ドット系ゴシックなので、
+   一部だけ別フォントに落ちる「混在」を防げる。未収録記号はSVGアイコン等に置換済み。 */
+@font-face {
+  font-family: 'DotGothic16';
+  src: url('/fonts/DotGothic16.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg: #eef1f5;
   --surface: #ffffff;
@@ -13,11 +24,19 @@
   --danger: #d64545;
   --radius: 10px;
   --shadow: 0 1px 2px rgba(20, 30, 60, 0.06), 0 8px 24px rgba(20, 30, 60, 0.08);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* DotGothic16 を主フォントに。読込前/未収録字はsans-serifへ（実際にはDotGothic16が全字カバー） */
+  font-family: 'DotGothic16', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
   box-sizing: border-box;
+}
+/* フォームコントロールは既定でOSフォントになるため、UIフォント(DotGothic16)を継承させる */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 [hidden] {
   display: none !important;
@@ -459,9 +478,16 @@ details summary {
 }
 .tool-actions #undoBtn,
 .tool-actions #redoBtn {
-  font-size: 16px;
-  line-height: 1;
   min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.tool-actions #undoBtn svg,
+.tool-actions #redoBtn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 .tool-actions #exportEdit {
   background: var(--accent);
