@@ -26,15 +26,20 @@
       <div class="details-bar">
         <span>画像 → ドット絵</span>
         <span class="tagline-detail">写真・イラストをきれいなドット絵に変換して手直しできます</span>
+        <span class="tagline-short">写真をきれいなドット絵に</span>
         <button id="tourStart" class="tour-start" type="button" aria-label="使い方ガイドを開く" aria-expanded="false">? 使い方</button>
       </div>
 
       <nav class="app-tabs" id="appTabs" role="tablist">
         <button class="tab active" data-mode="convert" title="画像を読み込んで（または白紙で）色・サイズを決め、ドット絵に変換します">変換</button>
+        <span class="tab-sep" aria-hidden="true">→</span>
         <button class="tab" data-mode="edit" title="ドット絵をペンなどで手直しします（大きく表示）">編集</button>
+        <span class="tab-sep" aria-hidden="true">→</span>
         <button class="tab" data-mode="anim" title="コマ（フレーム）を複数作り、パラパラアニメを作ります">アニメ</button>
+        <span class="tab-sep" aria-hidden="true">→</span>
         <button class="tab" data-mode="tilemap" title="作ったコマをタイルとして並べ、マップを作ります">タイルマップ</button>
       </nav>
+      <div class="tab-flow">同じ絵を引き継いで左から順に仕上げる1本の流れです（どのタブへも切り替え可）。</div>
 
       <div class="window-pane app-pane">
         <!-- スタート画面: 最初は2択だけ見せて混乱を防ぐ（読み込む / 一から描く） -->
@@ -98,18 +103,20 @@
               </button>
               <span class="hint-inline">下の出力サイズで新規キャンバス</span>
             </div>
-            <div class="field-row" id="bgSrcRow">
-              <span class="tb-label" title="縮小前の元画像から背景を消すので、輪郭がくっきり仕上がります（推奨）">背景切り抜き（元画像・推奨）</span>
-              <button id="bgSrcCut" class="btn" type="button" disabled title="元画像のフチから続く背景を透明にしてから変換します（縮小後より輪郭がきれいになります）">
-                元画像から切り抜く
-              </button>
-              <button id="bgSrcReset" class="btn" type="button" disabled title="切り抜きを取り消して元画像に戻します">戻す</button>
-              <select id="bgSrcTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
-                <option value="30">弱</option>
-                <option value="60" selected>中</option>
-                <option value="110">強</option>
-              </select>
-            </div>
+            <details class="sec-collapse">
+              <summary><span class="sec-title" title="縮小前の元画像から背景を消すので、輪郭がくっきり仕上がります（推奨）">背景切り抜き（元画像・推奨）</span></summary>
+              <div class="field-row" id="bgSrcRow">
+                <button id="bgSrcCut" class="btn" type="button" disabled title="元画像のフチから続く背景を透明にしてから変換します（縮小後より輪郭がきれいになります）">
+                  元画像から切り抜く
+                </button>
+                <button id="bgSrcReset" class="btn" type="button" disabled title="切り抜きを取り消して元画像に戻します">戻す</button>
+                <select id="bgSrcTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
+                  <option value="30">弱</option>
+                  <option value="60" selected>中</option>
+                  <option value="110">強</option>
+                </select>
+              </div>
+            </details>
 
             <hr class="separator" />
             <h3 class="sec-title" data-help="size">出力サイズ（ドットの粗さ）</h3>
@@ -179,7 +186,8 @@
             </details>
 
             <hr class="separator" />
-            <h3 class="sec-title" data-help="dither">色の混ぜ方（ディザリング）</h3>
+            <details class="sec-collapse">
+              <summary><h3 class="sec-title" data-help="dither">色の混ぜ方（ディザリング）</h3></summary>
             <p class="help">少ない色で階調を表現。小さいドット絵は「なし」が基本。</p>
             <div class="field-row dither-row">
               <input type="radio" id="dither-none" name="dither" value="none" checked />
@@ -209,9 +217,11 @@
               <input id="strength" type="range" min="0" max="1" step="0.05" value="1" />
               <span id="strengthVal" class="num">1.00</span>
             </div>
+            </details>
 
             <hr class="separator" />
-            <h3 class="sec-title" data-help="detail">詳細設定</h3>
+            <details class="sec-collapse">
+              <summary><h3 class="sec-title" data-help="detail">詳細設定</h3></summary>
             <div class="field-row">
               <label for="downscale" title="画像を小さくする際の縮め方">縮め方</label>
               <select id="downscale">
@@ -226,6 +236,7 @@
                 <option value="2000">高精度（やや遅い）</option>
               </select>
             </div>
+            </details>
 
             <hr class="separator" />
             <h3 class="sec-title" data-help="exportpng">書き出し（PNG保存）</h3>
@@ -306,7 +317,14 @@
                         <button id="flipH" class="control" type="button" title="左右反転（向き違いのスプライト作成に）" disabled><span class="icon">flip</span>左右反転</button>
                         <button id="flipV" class="control" type="button" title="上下反転" disabled><span class="icon icon--rot90">flip</span>上下反転</button>
                         <button id="clearCanvas" class="control control--danger" type="button" title="キャンバスを全部消して透明にします"><span class="icon">delete</span>全消去</button>
-                        <button id="exportEdit" class="control control--primary" type="button" title="このコマをPNGで保存（拡大率は変換タブの設定）" disabled><span class="icon">download</span>保存</button>
+                        <span class="bar-label" title="保存するPNGの拡大率（変換タブと共有）">拡大</span>
+                        <select id="exportScaleEdit" class="control" title="保存PNGを何倍に拡大するか。変換タブの拡大率と連動します。">
+                          <option value="1">×1（原寸）</option>
+                          <option value="4">×4</option>
+                          <option value="8" selected>×8</option>
+                          <option value="16">×16</option>
+                        </select>
+                        <button id="exportEdit" class="control control--primary" type="button" title="このコマをPNGで保存（右の拡大率で拡大保存）" disabled><span class="icon">download</span>保存</button>
                       </div>
                     </div>
 
@@ -315,6 +333,7 @@
                         <span class="bar-label">パレット</span>
                         <select id="editPaletteSelect" class="control" title="使う色セット（Game Boy風・PICO-8・自作 など）"></select>
                         <button id="editAddColor" class="control" type="button" title="いまの『描く色』をパレットに追加"><span class="icon icon--sm">add</span>色を追加</button>
+                        <span id="editPaletteNote" class="hint-inline" hidden></span>
                         <details class="edit-pal-custom">
                           <summary>自作（HEX / .gpl）</summary>
                           <textarea id="editCustomPalette" rows="3" placeholder="#1a1c2c #5d275d … または .gpl の中身を貼付"></textarea>
@@ -331,7 +350,14 @@
 
                     <div class="canvas-wrap" id="canvasWrap">
                       <canvas id="outCanvas" aria-label="ドット絵キャンバス（ドラッグで描画・スペース＋ドラッグで移動）"></canvas>
-                      <p id="emptyState" class="empty-state">ここに変換結果が表示されます</p>
+                      <div id="emptyState" class="empty-state">
+                        <p id="emptyStateText" class="empty-state-text">ここに変換結果が表示されます</p>
+                        <div class="empty-state-actions">
+                          <button id="emptyToConvert" class="control" type="button" title="「変換」タブへ移動して画像を読み込みます"><span class="icon icon--sm">tune</span>変換タブへ</button>
+                          <button id="emptyBlank" class="control control--primary" type="button" title="白紙のキャンバスを作って一から描き始めます"><span class="icon icon--sm">draw</span>白紙から作る</button>
+                          <button id="emptyAddImages" class="control" type="button" hidden title="連番画像をまとめてコマとして取り込みます"><span class="icon icon--sm">add_photo_alternate</span>画像を複数追加</button>
+                        </div>
+                      </div>
                     </div>
 
                     <div class="zoom-bar bar" id="zoomBar">
@@ -369,7 +395,7 @@
                   <div class="tool-group" title="コマを順に表示してアニメを確認">
                     <button id="playBtn" disabled title="コマを順に再生してアニメを確認">再生</button>
                     <label class="grid-toggle" title="1秒あたりのコマ数（速さ）">
-                      FPS <input id="fpsInput" type="number" min="1" max="30" value="8" style="width:56px" />
+                      速さ(FPS) <input id="fpsInput" type="number" min="1" max="30" value="8" style="width:56px" />
                     </label>
                   </div>
                   <div class="tool-group" data-help="animexport">
@@ -381,9 +407,10 @@
                 </div>
                 <div id="frameStrip" class="frame-strip" role="list" aria-label="コマ一覧（タイムライン）"></div>
 
-                <details class="ai-panel" id="aiPanel">
-                  <summary data-help="ai" title="文章から画像を生成し、そのままドット絵化します（Google Gemini）">AIで下絵を作る（β・Gemini）</summary>
+                <details class="ai-panel" id="aiPanel" open>
+                  <summary data-help="ai" title="文章から画像を生成し、そのままドット絵化します（Google Gemini）"><span class="icon" aria-hidden="true">draw</span>AIで下絵を作る（β・Gemini）<span class="ai-req-badge">要サーバー設定</span></summary>
                   <div class="ai-body">
+                    <p class="help ai-setup-note">利用にはサーバー側のセットアップ（Gemini APIキー）が必要です。未設定の場合は生成できません。管理者からアクセスコードを共有されている場合は、初回生成時に入力してください。</p>
                     <textarea id="aiPrompt" rows="2" placeholder="例：剣を持ったドット絵の勇者、正面向き、背景は無地"></textarea>
                     <div class="field-row">
                       <label class="grid-toggle" title="いま表示中の絵を下絵にして描き変えます（例：右向き→正面、色替え）">
@@ -396,7 +423,7 @@
                       <label><input type="radio" name="aiResult" value="ref" /> 透かし下絵にする</label>
                     </div>
                     <div class="field-row">
-                      <button id="aiGenerate" class="btn btn-default" type="button">生成する</button>
+                      <button id="aiGenerate" class="control control--primary" type="button"><span class="icon icon--sm" aria-hidden="true">draw</span>生成する</button>
                       <span id="aiStatus" class="hint-inline"></span>
                     </div>
                     <p class="help ai-note">
@@ -434,7 +461,13 @@
               <div id="tilePicker" class="tile-picker" role="list" aria-label="タイル一覧"></div>
               <div class="canvas-wrap" id="mapWrap">
                 <canvas id="mapCanvas" aria-label="タイルマップ（クリック/ドラッグで配置）"></canvas>
-                <p id="mapEmpty" class="empty-state">先にタイルを用意しましょう：「アニメ」タブで「コマを複製／空コマ追加」、または「変換」タブで1枚作るとタイルになります</p>
+                <div id="mapEmpty" class="empty-state">
+                  <p class="empty-state-text">先にタイルを用意しましょう。白紙のコマを作るか、「変換」タブで1枚作るとタイルになります。</p>
+                  <div class="empty-state-actions">
+                    <button id="mapEmptyBlank" class="control control--primary" type="button" title="白紙のコマを作ります（そのままタイルになります）"><span class="icon icon--sm">draw</span>白紙から作る</button>
+                    <button id="mapEmptyToConvert" class="control" type="button" title="「変換」タブで1枚作るとタイルになります"><span class="icon icon--sm">tune</span>変換タブへ</button>
+                  </div>
+                </div>
               </div>
             </section>
           </section>
