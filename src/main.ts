@@ -23,7 +23,6 @@ const startDrop = $('startDrop')
 const startBlankBtn = $<HTMLButtonElement>('startBlank')
 const startSize = $<HTMLSelectElement>('startSize')
 const startTiles = $<HTMLInputElement>('startTiles')
-const startTilesBlankBtn = $<HTMLButtonElement>('startTilesBlank')
 const fileInput = $<HTMLInputElement>('fileInput')
 const newBlankBtn = $<HTMLButtonElement>('newBlank')
 const outW = $<HTMLInputElement>('outW')
@@ -528,12 +527,6 @@ startTiles.addEventListener('change', () => {
     })
   }
   startTiles.value = ''
-})
-startTilesBlankBtn.addEventListener('click', () => {
-  outW.value = '32'
-  outH.value = '32'
-  newBlankBtn.click() // 白紙1コマ作成（enterWork＋edit）
-  setMode('tilemap') // タイルマップへ切替（空のマスから）
 })
 
 function drawSource(): void {
