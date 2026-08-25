@@ -34,6 +34,7 @@ const fileInput = $<HTMLInputElement>('fileInput')
 const newBlankBtn = $<HTMLButtonElement>('newBlank')
 const outW = $<HTMLInputElement>('outW')
 const outH = $<HTMLInputElement>('outH')
+const keepAspect = $<HTMLInputElement>('keepAspect')
 const paletteSelect = $<HTMLSelectElement>('paletteSelect')
 const adaptiveRow = $('adaptiveRow')
 const adaptiveCount = $<HTMLSelectElement>('adaptiveCount')
@@ -444,6 +445,30 @@ function clampInt(v: string, min: number, max: number, fallback: number): number
   const n = Math.round(Number(v))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
+}
+
+// --- 縦横比の保持（元画像がある時のみ有効）---
+// 元画像の縦横比。画像未読込なら null。
+function sourceAspect(): number | null {
+  return sourceImage ? sourceImage.width / sourceImage.height : null
+}
+// 長辺を long に合わせ、元画像の縦横比で {w,h} を返す。画像なしは正方形。
+function sizeForLongEdge(long: number): { w: number; h: number } {
+  const r = sourceAspect()
+  if (r == null) return { w: long, h: long }
+  return r >= 1
+    ? { w: long, h: Math.max(1, Math.round(long / r)) } // 横長・正方形
+    : { w: Math.max(1, Math.round(long * r)), h: long } // 縦長
+}
+// 「縦横比を保つ」ON かつ元画像ありのとき、片方の入力に合わせてもう片方を追従させる。
+function syncAspect(from: 'w' | 'h'): void {
+  const r = sourceAspect()
+  if (!keepAspect.checked || r == null) return
+  if (from === 'w') {
+    outH.value = String(Math.max(1, Math.min(2048, Math.round(clampInt(outW.value, 1, 2048, 16) / r))))
+  } else {
+    outW.value = String(Math.max(1, Math.min(2048, Math.round(clampInt(outH.value, 1, 2048, 16) * r))))
+  }
 }
 
 // 画像ファイルを PixelImage にデコード（巨大画像は SAFE_DIM 以下へ縮小）。失敗時 null。
@@ -1080,7 +1105,20 @@ fxReset.addEventListener('click', () => {
   onControlChange()
 })
 // 出力サイズは確定時(change)のみ反映。keystroke毎に確認ダイアログが出る/途中値で潰れるのを防ぐ。
-;[outW, outH].forEach((el) => el.addEventListener('change', onControlChange))
+// 「縦横比を保つ」ON なら、編集した側に合わせてもう片方を追従させてから再変換。
+outW.addEventListener('change', () => {
+  syncAspect('w')
+  onControlChange()
+})
+outH.addEventListener('change', () => {
+  syncAspect('h')
+  onControlChange()
+})
+// トグル切替: ONにした瞬間、現在の幅に合わせて高さをスナップ（元画像がある時）
+keepAspect.addEventListener('change', () => {
+  if (keepAspect.checked) syncAspect('w')
+  onControlChange()
+})
 exportScaleSel.addEventListener('input', updateExportSizeLabel)
 // 編集/アニメの共有拡大率 → 単一の真実(#exportScale)へ同期
 exportScaleEditSel.addEventListener('input', () => {
@@ -1092,8 +1130,12 @@ document
   .forEach((el) => el.addEventListener('change', onControlChange))
 document.querySelectorAll<HTMLElement>('.presets .btn[data-w]').forEach((chip) =>
   chip.addEventListener('click', () => {
-    outW.value = chip.dataset.w ?? '16'
-    outH.value = chip.dataset.h ?? '16'
+    const n = Number(chip.dataset.w ?? '16')
+    // 縦横比を保つ ON かつ元画像あり → プリセットの数字を「長辺」として縦横比を維持
+    const dims =
+      keepAspect.checked && sourceImage ? sizeForLongEdge(n) : { w: n, h: Number(chip.dataset.h ?? '16') }
+    outW.value = String(dims.w)
+    outH.value = String(dims.h)
     onControlChange()
   })
 )
