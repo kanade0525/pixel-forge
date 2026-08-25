@@ -2,6 +2,7 @@
 // Canvas 非依存（PixelImage のみ）でテスト可能。
 import type { PixelImage, ConvertOptions } from './types'
 import { downscale } from './downscale/downscale'
+import { applyEffects } from './preprocess/effects'
 import { quantizeNearest } from './quantize/nearest'
 import { quantizeOrdered } from './quantize/ordered'
 import { quantizeFloydSteinberg } from './quantize/floyd-steinberg'
@@ -28,7 +29,13 @@ export function quantizeImage(small: PixelImage, opts: ConvertOptions): PixelIma
   }
 }
 
-export function convert(src: PixelImage, opts: ConvertOptions): PixelImage {
+// 縮小 → 前処理エフェクト を行い、量子化前の小さい画像を返す。
+// 自動生成パレットは加工後の色から作りたいので、量子化と分けて公開する。
+export function downscaleAndPreprocess(src: PixelImage, opts: ConvertOptions): PixelImage {
   const small = downscale(src, opts.targetW, opts.targetH, opts.downscale)
-  return quantizeImage(small, opts)
+  return opts.effects ? applyEffects(small, opts.effects) : small
+}
+
+export function convert(src: PixelImage, opts: ConvertOptions): PixelImage {
+  return quantizeImage(downscaleAndPreprocess(src, opts), opts)
 }
