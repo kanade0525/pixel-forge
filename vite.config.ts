@@ -53,9 +53,12 @@ function devApiPlugin(env: Record<string, string>): Plugin {
   }
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), '') // すべての env（VITE_ 接頭辞なしも）を読む
   return {
+    // GitHub Pages はプロジェクトページ（https://<user>.github.io/pixel-forge/）配下で配信するため
+    // ビルド時のみ base をサブパスにする。dev サーバはルート配信のまま。
+    base: command === 'build' ? '/pixel-forge/' : '/',
     plugins: [
       devApiPlugin(env),
       {
