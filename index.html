@@ -127,6 +127,12 @@
               <label for="outH">高さ</label>
               <input id="outH" type="number" min="1" max="2048" value="16" />
             </div>
+            <div class="field-row">
+              <label class="check" title="オンにすると、幅/高さの変更やプリセット選択で元画像の縦横比を保ちます（写真がつぶれません）。プリセットの数字は「長辺」の大きさとして使われます。">
+                <input id="keepAspect" type="checkbox" checked />縦横比を保つ
+              </label>
+              <span class="hint-inline">プリセットは長辺の大きさ</span>
+            </div>
             <div class="field-row presets">
               <button class="btn" data-w="16" data-h="16">16×16</button>
               <button class="btn" data-w="32" data-h="32">32×32</button>
