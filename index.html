@@ -186,6 +186,52 @@
             </details>
 
             <hr class="separator" />
+            <details class="sec-collapse" id="fxPanel">
+              <summary><h3 class="sec-title" data-help="effects">加工（変換前のエフェクト）</h3></summary>
+              <p class="help">ドット化する前に写真を加工します。すべて任意（既定はオフ）。</p>
+              <div class="field-row">
+                <label for="fxBrightness" title="明るさ。＋で明るく、－で暗く。">輝度 <span id="fxBrightnessVal" class="num">0</span></label>
+                <input id="fxBrightness" type="range" min="-100" max="100" step="1" value="0" />
+              </div>
+              <div class="field-row">
+                <label for="fxContrast" title="明暗の差。＋で強く（くっきり）、－で弱く。">コントラスト <span id="fxContrastVal" class="num">0</span></label>
+                <input id="fxContrast" type="range" min="-100" max="100" step="1" value="0" />
+              </div>
+              <div class="field-row">
+                <label for="fxPosterize" title="色を数段階に減らしてフラットな塗りに（ポスタリゼーション）。">ポスタリゼーション</label>
+                <select id="fxPosterize">
+                  <option value="0" selected>オフ</option>
+                  <option value="2">2段階（強）</option>
+                  <option value="3">3段階</option>
+                  <option value="4">4段階</option>
+                  <option value="6">6段階</option>
+                  <option value="8">8段階（弱）</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <label for="fxCartoon" title="輪郭線を描いてアニメ調に（カートゥーン化）。強いほど細い線も拾います。">カートゥーン化（輪郭線） <span id="fxCartoonVal" class="num">0</span></label>
+                <input id="fxCartoon" type="range" min="0" max="100" step="1" value="0" />
+              </div>
+              <div class="field-row">
+                <label for="fxToner" title="印刷の網点（トナー）風の陰影を加えます。強いほど濃く。">CCトナー（網点） <span id="fxTonerVal" class="num">0</span></label>
+                <input id="fxToner" type="range" min="0" max="100" step="1" value="0" />
+              </div>
+              <div class="field-row">
+                <label for="fxMosaic" title="さらに粗いブロックにまとめてモザイク状にします。">モザイク</label>
+                <select id="fxMosaic">
+                  <option value="1" selected>オフ</option>
+                  <option value="2">2×2</option>
+                  <option value="3">3×3</option>
+                  <option value="4">4×4</option>
+                  <option value="6">6×6</option>
+                </select>
+              </div>
+              <div class="field-row">
+                <button id="fxReset" class="btn" type="button" title="加工をすべてオフに戻します">加工をリセット</button>
+              </div>
+            </details>
+
+            <hr class="separator" />
             <details class="sec-collapse">
               <summary><h3 class="sec-title" data-help="dither">色の混ぜ方（ディザリング）</h3></summary>
             <p class="help">少ない色で階調を表現。小さいドット絵は「なし」が基本。</p>

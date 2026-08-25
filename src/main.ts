@@ -1,10 +1,17 @@
 // スタイルは index.html の <link> で読み込む（描画前にCSS適用しFOUCを防ぐ）
-import type { ConvertOptions, DitherMode, DownscaleMode, BayerSize, Palette, PixelImage } from './types'
+import type {
+  ConvertOptions,
+  DitherMode,
+  DownscaleMode,
+  BayerSize,
+  Palette,
+  PixelImage,
+  EffectOptions,
+} from './types'
 import { PALETTES, getPalette, hexToPaletteColor } from './palettes/palettes'
 import { parsePaletteText } from './palettes/parse'
 import { medianCutPalette } from './palettes/adaptive'
-import { downscale } from './downscale/downscale'
-import { quantizeImage } from './pipeline'
+import { quantizeImage, downscaleAndPreprocess } from './pipeline'
 import { makeZip } from './export/zip'
 import { initTour, autoStartTour } from './tour'
 import { initHelp } from './help'
@@ -131,6 +138,18 @@ const strength = $<HTMLInputElement>('strength')
 const strengthVal = $('strengthVal')
 const downscaleSel = $<HTMLSelectElement>('downscale')
 const deltaModeSel = $<HTMLSelectElement>('deltaMode')
+// 変換前の加工エフェクト
+const fxBrightness = $<HTMLInputElement>('fxBrightness')
+const fxContrast = $<HTMLInputElement>('fxContrast')
+const fxPosterize = $<HTMLSelectElement>('fxPosterize')
+const fxCartoon = $<HTMLInputElement>('fxCartoon')
+const fxToner = $<HTMLInputElement>('fxToner')
+const fxMosaic = $<HTMLSelectElement>('fxMosaic')
+const fxBrightnessVal = $('fxBrightnessVal')
+const fxContrastVal = $('fxContrastVal')
+const fxCartoonVal = $('fxCartoonVal')
+const fxTonerVal = $('fxTonerVal')
+const fxReset = $<HTMLButtonElement>('fxReset')
 const exportScaleSel = $<HTMLSelectElement>('exportScale')
 const exportScaleEditSel = $<HTMLSelectElement>('exportScaleEdit')
 const exportSizeLabel = $('exportSizeLabel')
@@ -404,6 +423,19 @@ function readOptions(): ConvertOptions {
     deltaMode: deltaModeSel.value as '76' | '2000',
     strength: Number(strength.value),
     serpentine: serpentine.checked,
+    effects: readEffects(),
+  }
+}
+
+// 変換前の加工エフェクト（UIコントロール → EffectOptions）
+function readEffects(): EffectOptions {
+  return {
+    brightness: Number(fxBrightness.value),
+    contrast: Number(fxContrast.value),
+    posterizeLevels: Number(fxPosterize.value),
+    cartoon: Number(fxCartoon.value),
+    toner: Number(fxToner.value),
+    mosaic: Number(fxMosaic.value),
   }
 }
 
@@ -569,7 +601,7 @@ function scheduleRender(): void {
 function render(): void {
   if (!sourceImage) return
   const opts = readOptions()
-  const small = downscale(sourceImage, opts.targetW, opts.targetH, opts.downscale)
+  const small = downscaleAndPreprocess(sourceImage, opts)
 
   // 自動生成パレットは縮小後の画像から作る（画像内の代表色にフィット）
   let palette = opts.palette
@@ -1014,8 +1046,39 @@ newBlankBtn.addEventListener('click', () => {
   }
 })
 
-const rerenderEls = [bayerSize, strength, downscaleSel, deltaModeSel, serpentine, adaptiveCount]
+const rerenderEls = [
+  bayerSize,
+  strength,
+  downscaleSel,
+  deltaModeSel,
+  serpentine,
+  adaptiveCount,
+  fxBrightness,
+  fxContrast,
+  fxPosterize,
+  fxCartoon,
+  fxToner,
+  fxMosaic,
+]
 rerenderEls.forEach((el) => el.addEventListener('input', onControlChange))
+
+// 加工エフェクトのスライダー現在値表示を同期
+function syncEffectLabels(): void {
+  fxBrightnessVal.textContent = fxBrightness.value
+  fxContrastVal.textContent = fxContrast.value
+  fxCartoonVal.textContent = fxCartoon.value
+  fxTonerVal.textContent = fxToner.value
+}
+// 「加工をリセット」: 全エフェクトを中立値へ戻して再変換
+fxReset.addEventListener('click', () => {
+  fxBrightness.value = '0'
+  fxContrast.value = '0'
+  fxPosterize.value = '0'
+  fxCartoon.value = '0'
+  fxToner.value = '0'
+  fxMosaic.value = '1'
+  onControlChange()
+})
 // 出力サイズは確定時(change)のみ反映。keystroke毎に確認ダイアログが出る/途中値で潰れるのを防ぐ。
 ;[outW, outH].forEach((el) => el.addEventListener('change', onControlChange))
 exportScaleSel.addEventListener('input', updateExportSizeLabel)
@@ -1048,6 +1111,7 @@ $<HTMLButtonElement>('origSize').addEventListener('click', () => {
 
 function onControlChange(): void {
   strengthVal.textContent = Number(strength.value).toFixed(2)
+  syncEffectLabels()
   updateVisibility()
   updateExportSizeLabel()
   scheduleRender()
@@ -2036,7 +2100,7 @@ async function addImagesAsFrames(files: File[]): Promise<void> {
       decoded = null
     }
     if (!decoded) continue
-    const small = downscale(decoded.img, w, h, opts.downscale)
+    const small = downscaleAndPreprocess(decoded.img, { ...opts, targetW: w, targetH: h })
     if (isAdaptive() && !pal) {
       pal = medianCutPalette(small, Number(adaptiveCount.value))
       lastAdaptive = pal
@@ -2326,7 +2390,7 @@ async function aiGenerate(): Promise<void> {
     const opts = readOptions()
     const w = frames.length ? frames[0].width : opts.targetW
     const h = frames.length ? frames[0].height : opts.targetH
-    const small = downscale(raw, w, h, opts.downscale)
+    const small = downscaleAndPreprocess(raw, { ...opts, targetW: w, targetH: h })
     let pal = opts.palette
     if (isAdaptive()) {
       pal = medianCutPalette(small, Number(adaptiveCount.value))
