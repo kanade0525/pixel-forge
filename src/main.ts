@@ -12,6 +12,7 @@ import { PALETTES, getPalette, hexToPaletteColor } from './palettes/palettes'
 import { parsePaletteText } from './palettes/parse'
 import { medianCutPalette } from './palettes/adaptive'
 import { quantizeImage, downscaleAndPreprocess } from './pipeline'
+import { removeBackgroundSmart } from './preprocess/bgremove'
 import { makeZip } from './export/zip'
 import { initTour, autoStartTour } from './tour'
 import { initHelp } from './help'
@@ -1837,63 +1838,6 @@ function colorDist2(r1: number, g1: number, b1: number, r2: number, g2: number, 
   const db = b1 - b2
   return dr * dr + dg * dg + db * db
 }
-// フチから続く背景（周囲と色が近い連結領域）を透明化。変化した画素数を返す。
-function removeBackgroundEdges(img: PixelImage, tol: number): number {
-  const { width: w, height: h, data: d } = img
-  const orig = d.slice()
-  const visited = new Uint8Array(w * h)
-  const tol2 = tol * tol
-  const stack: number[] = []
-  let removed = 0
-  const seed = (x: number, y: number) => {
-    const idx = y * w + x
-    if (visited[idx] || d[idx * 4 + 3] === 0) return
-    visited[idx] = 1
-    d[idx * 4 + 3] = 0
-    removed++
-    stack.push(idx)
-  }
-  for (let x = 0; x < w; x++) {
-    seed(x, 0)
-    seed(x, h - 1)
-  }
-  for (let y = 0; y < h; y++) {
-    seed(0, y)
-    seed(w - 1, y)
-  }
-  const near = (a: number, b: number) =>
-    colorDist2(
-      orig[a * 4],
-      orig[a * 4 + 1],
-      orig[a * 4 + 2],
-      orig[b * 4],
-      orig[b * 4 + 1],
-      orig[b * 4 + 2]
-    ) <= tol2
-  while (stack.length) {
-    const p = stack.pop()!
-    const px = p % w
-    const py = (p / w) | 0
-    const neigh = [
-      [px + 1, py],
-      [px - 1, py],
-      [px, py + 1],
-      [px, py - 1],
-    ]
-    for (const [nx, ny] of neigh) {
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
-      const n = ny * w + nx
-      if (visited[n] || d[n * 4 + 3] === 0) continue
-      if (near(p, n)) {
-        visited[n] = 1
-        d[n * 4 + 3] = 0
-        removed++
-        stack.push(n)
-      }
-    }
-  }
-  return removed
-}
 // 指定色に近い画素をすべて透明化（クロマキー）。変化数を返す。
 function removeColorKey(img: PixelImage, r: number, g: number, b: number, tol: number): number {
   const d = img.data
@@ -1911,7 +1855,7 @@ function removeColorKey(img: PixelImage, r: number, g: number, b: number, tol: n
 bgEdgesBtn.addEventListener('click', () => {
   if (!lastResult) return
   pushUndo()
-  const removed = removeBackgroundEdges(lastResult, Number(bgTol.value))
+  const removed = removeBackgroundSmart(lastResult, Number(bgTol.value), false)
   if (removed > 0) {
     drawOutput()
     showToast(`背景を切り抜きました（${removed}ドット）`)
@@ -2096,7 +2040,7 @@ function applySourceBgCut(): void {
     height: sourceOriginal.height,
     data: sourceOriginal.data.slice(),
   }
-  const removed = removeBackgroundEdges(sourceImage, Number(bgSrcTol.value))
+  const removed = removeBackgroundSmart(sourceImage, Number(bgSrcTol.value), true)
   sourceBgCut = true
   sourceJustLoaded = true // 下地が変わったので作り直す
   drawSource()
