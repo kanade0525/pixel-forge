@@ -15,5 +15,8 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.11"
+  },
+  "dependencies": {
+    "onnxruntime-web": "^1.19.2"
   }
 }

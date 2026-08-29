@@ -9,8 +9,8 @@ const CSP = [
   "img-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:", // Vite が小さめフォントを data: URI でインライン化するため許可
-  "script-src 'self'",
-  "connect-src 'self'", // /api/generate（同一オリジンのプロキシ）のみ。外部ホストへは張らない。
+  "script-src 'self' 'wasm-unsafe-eval'", // AI背景切り抜き(onnxruntime-web)の WASM 実行に必要
+  "connect-src 'self'", // /api/generate と AIモデル/wasm（すべて同一オリジン）のみ。外部へは張らない。
   "object-src 'none'",
   "base-uri 'none'",
 ].join('; ')
@@ -59,6 +59,9 @@ export default defineConfig(({ mode, command }) => {
     // GitHub Pages はプロジェクトページ（https://<user>.github.io/pixel-forge/）配下で配信するため
     // ビルド時のみ base をサブパスにする。dev サーバはルート配信のまま。
     base: command === 'build' ? '/pixel-forge/' : '/',
+    // onnxruntime-web は動的 import で別チャンク化し、wasm は public/ort を自前参照するため
+    // 依存最適化の対象から外す（dev の prebundle 失敗を防ぐ）。
+    optimizeDeps: { exclude: ['onnxruntime-web'] },
     plugins: [
       devApiPlugin(env),
       {
