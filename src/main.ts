@@ -13,6 +13,7 @@ import { parsePaletteText } from './palettes/parse'
 import { medianCutPalette } from './palettes/adaptive'
 import { quantizeImage, downscaleAndPreprocess } from './pipeline'
 import { removeBackgroundSmart } from './preprocess/bgremove'
+import { removeBackgroundAI } from './ai/backgroundRemoval'
 import { makeZip } from './export/zip'
 import { initTour, autoStartTour } from './tour'
 import { initHelp } from './help'
@@ -88,6 +89,8 @@ const addImagesInput = $<HTMLInputElement>('addImagesInput')
 const bgSrcCut = $<HTMLButtonElement>('bgSrcCut')
 const bgSrcReset = $<HTMLButtonElement>('bgSrcReset')
 const bgSrcTol = $<HTMLSelectElement>('bgSrcTol')
+const bgSrcAI = $<HTMLButtonElement>('bgSrcAI')
+const bgAiStatus = $('bgAiStatus')
 const openModalBtn = $<HTMLButtonElement>('openModal')
 const toEditBtn = $<HTMLButtonElement>('toEdit')
 const exportEditBtn = $<HTMLButtonElement>('exportEdit')
@@ -529,6 +532,7 @@ async function loadFile(file: File): Promise<void> {
     document.body.classList.add('has-image')
     bgSrcCut.disabled = false
     bgSrcReset.disabled = false
+    bgSrcAI.disabled = false
     // 既定の出力サイズは「元のサイズ」（読み込んだ画像の解像度そのまま）
     outW.value = String(img.width)
     outH.value = String(img.height)
@@ -1018,6 +1022,7 @@ newBlankBtn.addEventListener('click', () => {
   sourceOriginal = null
   bgSrcCut.disabled = true
   bgSrcReset.disabled = true
+  bgSrcAI.disabled = true
   sourceJustLoaded = false
   frames = [blankFrame(w, h)]
   currentFrame = 0
@@ -2047,9 +2052,51 @@ function applySourceBgCut(): void {
   scheduleRender()
   showToast(removed > 0 ? '元画像の背景を切り抜きました' : 'フチに切り抜ける背景が見つかりませんでした')
 }
-bgSrcCut.addEventListener('click', applySourceBgCut)
+bgSrcCut.addEventListener('click', () => {
+  lastCutWasAI = false
+  applySourceBgCut()
+})
 bgSrcTol.addEventListener('change', () => {
-  if (sourceBgCut) applySourceBgCut() // 切り抜き済みなら強さ変更で再適用
+  // 色ベースで切り抜き済みのときだけ強さ変更で再適用（AI結果は潰さない）
+  if (sourceBgCut && !lastCutWasAI) applySourceBgCut()
+})
+// --- AI背景切り抜き（U²-Netp・完全ブラウザ内） ---
+let lastCutWasAI = false
+let aiBgRunning = false
+bgSrcAI.addEventListener('click', async () => {
+  if (!sourceOriginal || aiBgRunning) return
+  aiBgRunning = true
+  bgSrcAI.disabled = true
+  bgSrcCut.disabled = true
+  bgAiStatus.hidden = false
+  const src: PixelImage = {
+    width: sourceOriginal.width,
+    height: sourceOriginal.height,
+    data: sourceOriginal.data.slice(),
+  }
+  try {
+    const cut = await removeBackgroundAI(src, {
+      onStatus: (m) => {
+        bgAiStatus.textContent = m
+      },
+    })
+    sourceImage = cut
+    sourceBgCut = true
+    lastCutWasAI = true
+    sourceJustLoaded = true // 下地が変わったので作り直す
+    drawSource()
+    scheduleRender()
+    bgAiStatus.hidden = true
+    showToast('AIで背景を切り抜きました')
+  } catch (err) {
+    console.error(err)
+    bgAiStatus.hidden = true
+    showToast('AI切り抜きに失敗しました（通信/対応環境をご確認ください）。色ベースもお試しください')
+  } finally {
+    aiBgRunning = false
+    bgSrcAI.disabled = false
+    bgSrcCut.disabled = false
+  }
 })
 bgSrcReset.addEventListener('click', () => {
   if (!sourceOriginal) return
@@ -2392,6 +2439,7 @@ async function aiGenerate(): Promise<void> {
       sourceBgCut = false
       bgSrcCut.disabled = false
       bgSrcReset.disabled = false
+      bgSrcAI.disabled = false
       drawSource()
       refMode.value = 'source'
       onionOpacity.disabled = false

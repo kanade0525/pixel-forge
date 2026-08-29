@@ -105,16 +105,24 @@
             </div>
             <details class="sec-collapse">
               <summary><span class="sec-title" title="縮小前の元画像から背景を消すので、輪郭がくっきり仕上がります（推奨）">背景切り抜き（元画像・推奨）</span></summary>
-              <div class="field-row" id="bgSrcRow">
-                <button id="bgSrcCut" class="btn" type="button" disabled title="元画像のフチから続く背景を透明にしてから変換します（縮小後より輪郭がきれいになります）">
-                  元画像から切り抜く
+              <p class="help">被写体を残して背景を透明化。まず「AIで切り抜く」を。背景が単色/グラデなら色ベースでもOK。</p>
+              <div class="field-row">
+                <button id="bgSrcAI" class="control control--primary" type="button" disabled title="AI（U²-Net）が被写体を判定して背景を自動で切り抜きます。複雑な背景でも有効。初回のみAIエンジン＋モデルを読み込みます（実転送 約7MB・無料・以降キャッシュ）。">
+                  <span class="icon icon--sm">draw</span>AIで背景を切り抜く
                 </button>
-                <button id="bgSrcReset" class="btn" type="button" disabled title="切り抜きを取り消して元画像に戻します">戻す</button>
-                <select id="bgSrcTol" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
+                <span id="bgAiStatus" class="hint-inline" hidden></span>
+              </div>
+              <div class="field-row" id="bgSrcRow">
+                <span class="hint-inline">色ベース：</span>
+                <button id="bgSrcCut" class="control" type="button" disabled title="元画像のフチから続く一様な背景を透明にします（単色/グラデ背景向き）">
+                  フチから切り抜く
+                </button>
+                <select id="bgSrcTol" class="control" title="どこまで近い色を背景とみなすか（強いほど広く消えます）">
                   <option value="30">弱</option>
                   <option value="60" selected>中</option>
                   <option value="110">強</option>
                 </select>
+                <button id="bgSrcReset" class="control" type="button" disabled title="切り抜きを取り消して元画像に戻します">戻す</button>
               </div>
             </details>
 

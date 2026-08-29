@@ -14,6 +14,16 @@
   `public/fonts/LICENSE-MaterialSymbols.txt` に同梱。可変軸を静的化し、使用アイコンのみ
   subset して woff2 で自前ホスト（`public/fonts/MaterialSymbols.subset.woff2`）。
 
+## AI背景切り抜き（任意機能）
+
+- **ONNX Runtime Web**（© Microsoft）
+  — MIT License で配布。商用利用可。ブラウザ内推論エンジンとして使用（依存関係。
+  wasm はビルド時に同一オリジンへバンドルし自前配信）。
+- **U²-Net（軽量版 `u2netp.onnx`）**（Xie Bin Qin ほか / U-2-Net プロジェクト）
+  — Apache License 2.0 で配布。商用利用可。被写体（顕著物体）マスク推定に使用し、
+  `public/models/u2netp.onnx` として自前ホスト。モデルの改変はしていません。
+  ※ `u2net_portrait` / `u2net_human_seg` 等の非商用データ由来の派生モデルは使用していません。
+
 ## パレット配色のクレジット
 
 一部の同梱パレットは各作者のパレットをそのまま収録しています（色値自体は事実データであり
