@@ -1,6 +1,10 @@
 // AI 背景切り抜き（U²-Netp / onnxruntime-web・完全ブラウザ内・自前ホスト）。
 // モデルと wasm は同一オリジンから配信（CSP: connect-src 'self'）。初回のみ読み込み、以降キャッシュ。
-// Pages は cross-origin isolation 不可のため単一スレッド WASM で動かす（SharedArrayBuffer 不要）。
+// Pages は cross-origin isolation 不可（COOP/COEP を付けられない）ため、SharedArrayBuffer が使えない。
+// onnxruntime-web 1.19 以降が同梱する wasm は -threaded 版のみで、グルーコードが
+// メインスレッドで無条件に shared:true な WebAssembly.Memory を作るため初期化に失敗する
+// （numThreads=1 では回避できない）。非スレッド版 wasm を同梱する 1.18.0 に固定し、
+// vite.config.ts の ortWasmPlugin が /ort/ へ配る単一スレッド wasm を wasmPaths で明示指定する。
 import type * as Ort from 'onnxruntime-web'
 import type { PixelImage } from '../types'
 import { toModelInput, maskToAlpha, applyAlphaMask, MODEL_SIZE } from './segmentPreprocess'
@@ -12,10 +16,13 @@ let sessionPromise: Promise<{ ort: typeof Ort; session: Ort.InferenceSession }> 
 function loadSession(): Promise<{ ort: typeof Ort; session: Ort.InferenceSession }> {
   if (!sessionPromise) {
     sessionPromise = (async () => {
-      const ort = await import('onnxruntime-web')
+      // wasm EP だけのサブパス。webgl/webgpu を含まず、protobufjs の直接 eval も入らないため
+      // CSP に 'unsafe-eval' を足さずに済む（許可しているのは 'wasm-unsafe-eval' のみ）。
+      const ort = await import('onnxruntime-web/wasm')
       ort.env.wasm.numThreads = 1 // COOP/COEP 無し環境（GitHub Pages）は単一スレッド
+      ort.env.wasm.simd = true // SIMD 非対応環境では ort-wasm.wasm へ自動フォールバック
       ort.env.wasm.proxy = false
-      // wasm は Vite がバンドルし import.meta.url で解決される（同一オリジン）。wasmPaths は設定しない。
+      ort.env.wasm.wasmPaths = `${BASE}ort/` // 同一オリジン配信（CSP: default-src 'self'）
       const session = await ort.InferenceSession.create(`${BASE}models/u2netp.onnx`, {
         executionProviders: ['wasm'],
         graphOptimizationLevel: 'all',
