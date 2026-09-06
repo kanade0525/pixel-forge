@@ -60,6 +60,7 @@ const redoBtn = $<HTMLButtonElement>('redoBtn')
 const flipHBtn = $<HTMLButtonElement>('flipH')
 const flipVBtn = $<HTMLButtonElement>('flipV')
 const gridToggle = $<HTMLInputElement>('gridToggle')
+const editBgSelect = $<HTMLSelectElement>('editBgSelect')
 const canvasWInput = $<HTMLInputElement>('canvasW')
 const canvasHInput = $<HTMLInputElement>('canvasH')
 const applyCanvasSizeBtn = $<HTMLButtonElement>('applyCanvasSize')
@@ -215,6 +216,15 @@ let tool: Tool = 'pencil'
 let paint = { r: 0, g: 0, b: 0 } // 描く色
 let selectedSwatch = -1 // 選択中スウォッチの index（同色重複でも1つだけ強調）
 let showGrid = true // グリッドは既定ON（チェックボックスも checked）
+// 編集キャンバスの下地（透明部分の下に敷くもの）。表示だけの設定で書き出しには影響しない。
+type EditBackdrop = 'checker' | 'white' | 'black'
+const BACKDROP_KEY = 'pf_edit_backdrop'
+function isBackdrop(v: string | null): v is EditBackdrop {
+  return v === 'checker' || v === 'white' || v === 'black'
+}
+const savedBackdrop = lsGet(BACKDROP_KEY)
+let editBackdrop: EditBackdrop = isBackdrop(savedBackdrop) ? savedBackdrop : 'checker'
+editBgSelect.value = editBackdrop
 let painting = false
 let paintInitialized = false
 let lastPx = -1
@@ -782,8 +792,9 @@ function getCheckerPattern(ctx: CanvasRenderingContext2D, dark: boolean): Canvas
   checkerPatternDark = dark
   return checkerPattern
 }
-// 透過チェッカー。zoom>=4 は 1ドット=1マス（グリッドと完全一致）、低倍率は固定パターン。
-function drawCheckerboard(
+// 編集キャンバスの下地。既定は透過チェッカーで、白／黒を選ぶと単色で塗る。
+// チェッカーは zoom>=4 なら 1ドット=1マス（グリッドと完全一致）、低倍率は固定パターン。
+function drawBackdrop(
   ctx: CanvasRenderingContext2D,
   x0: number,
   y0: number,
@@ -792,6 +803,12 @@ function drawCheckerboard(
   zoom: number
 ): void {
   if (!lastResult) return
+  if (editBackdrop !== 'checker') {
+    // 塗る範囲は画像の矩形ちょうどなのでクリップは不要
+    ctx.fillStyle = editBackdrop === 'white' ? '#ffffff' : '#000000'
+    ctx.fillRect(x0, y0, iw, ih)
+    return
+  }
   const dark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
   const cA = dark ? '#2a2f3a' : '#ffffff'
   const cB = dark ? '#353c4a' : '#dfe3ea'
@@ -834,8 +851,8 @@ function drawOutput(): void {
   const z = currentZoom
   const iw = lastResult.width * z
   const ih = lastResult.height * z
-  // 透過チェッカーをキャンバス上に描く（グリッド＝1ドットと基準/位置を完全一致させ、干渉を防ぐ）
-  drawCheckerboard(ctx, panX, panY, iw, ih, z)
+  // 下地を描く（チェッカーはグリッド＝1ドットと基準/位置を完全一致させ、干渉を防ぐ）
+  drawBackdrop(ctx, panX, panY, iw, ih, z)
   // 透かし（下絵）: 参照画像を薄く下に敷く。元画像 or 前フレーム。（再生中は出さない）
   const rm = playing ? 'none' : refMode.value
   const alpha = Number(onionOpacity.value)
@@ -1687,6 +1704,12 @@ function updateCanvasCursor(): void {
 paintColorInput.addEventListener('input', () => {
   const c = hexToPaletteColor(paintColorInput.value)
   setPaintColor(c.r, c.g, c.b)
+})
+editBgSelect.addEventListener('change', () => {
+  const v = editBgSelect.value
+  editBackdrop = isBackdrop(v) ? v : 'checker'
+  lsSet(BACKDROP_KEY, editBackdrop)
+  drawOutput()
 })
 gridToggle.addEventListener('change', () => {
   showGrid = gridToggle.checked

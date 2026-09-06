@@ -357,6 +357,12 @@
                       <button id="mirrorX" class="control control--toggle" type="button" aria-pressed="false" title="左右対称に同時に描く"><span class="icon">flip</span>左右対称</button>
                       <button id="mirrorY" class="control control--toggle" type="button" aria-pressed="false" title="上下対称に同時に描く"><span class="icon icon--rot90">flip</span>上下対称</button>
                       <label class="check" title="ドットの境目にグリッド線を表示（位置合わせに便利）"><input id="gridToggle" type="checkbox" checked /><span class="icon">grid_on</span>グリッド</label>
+                      <span class="bar-label" title="透明部分の下に敷く色。表示だけの設定で、保存するPNGには影響しません">下地</span>
+                      <select id="editBgSelect" class="control" title="透明部分の下に敷く色。表示だけの設定で、保存するPNGには影響しません">
+                        <option value="checker" selected>市松</option>
+                        <option value="white">白</option>
+                        <option value="black">黒</option>
+                      </select>
                       <span class="bar-label" title="キャンバスの大きさ（ドット数）を後から変更。内容は中央を保って拡張／切り抜きします">サイズ</span>
                       <input id="canvasW" class="control control--input" type="number" min="1" max="512" style="width:56px" aria-label="幅(ドット)" />
                       <span class="bar-x">×</span>
