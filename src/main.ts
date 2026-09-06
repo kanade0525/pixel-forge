@@ -184,6 +184,9 @@ const HARD_MAX_AREA = HARD_MAX_MP * 1_000_000
 let sourceImage: PixelImage | null = null
 let sourceOriginal: PixelImage | null = null // 背景切り抜き前の原本
 let sourceBgCut = false // 元画像の背景切り抜きを適用中か
+// 元画像の世代。差し替え・破棄・元に戻す のたびに進める。
+// 非同期処理（AI切り抜き）は開始時の値を控え、完了時に一致しなければ結果を捨てる。
+let sourceGen = 0
 let customPal: Palette | null = null
 // アニメ再生
 let playTimer = 0
@@ -523,6 +526,7 @@ async function loadFile(file: File): Promise<void> {
     sourceOriginal = { width: img.width, height: img.height, data: img.data.slice() } // 切り抜き前の原本
     sourceImage = img
     sourceBgCut = false // 新規画像は切り抜き前状態
+    sourceGen++ // 実行中の AI 切り抜きがあれば、その結果は破棄させる
     sourceJustLoaded = true // 新規画像 → フレームを作り直す
     infoSrc.textContent =
       img.width !== origW || img.height !== origH
@@ -1020,6 +1024,7 @@ newBlankBtn.addEventListener('click', () => {
   const h = clampInt(outH.value, 1, 2048, 16)
   sourceImage = null // 元画像なし
   sourceOriginal = null
+  sourceGen++ // 実行中の AI 切り抜きがあれば、その結果は破棄させる
   bgSrcCut.disabled = true
   bgSrcReset.disabled = true
   bgSrcAI.disabled = true
@@ -2064,7 +2069,14 @@ bgSrcTol.addEventListener('change', () => {
 let lastCutWasAI = false
 let aiBgRunning = false
 bgSrcAI.addEventListener('click', async () => {
-  if (!sourceOriginal || aiBgRunning) return
+  if (!sourceOriginal) return
+  if (aiBgRunning) {
+    // 画像を差し替えるとボタンは再び押せるようになるが、推論は直列化する必要がある
+    // （ORT の InferenceSession は同時実行できない）。黙って無視せず理由を伝える。
+    showToast('AI切り抜きを実行中です。完了までお待ちください')
+    return
+  }
+  const gen = sourceGen // この実行が対象とする元画像の世代
   aiBgRunning = true
   bgSrcAI.disabled = true
   bgSrcCut.disabled = true
@@ -2077,25 +2089,29 @@ bgSrcAI.addEventListener('click', async () => {
   try {
     const cut = await removeBackgroundAI(src, {
       onStatus: (m) => {
-        bgAiStatus.textContent = m
+        if (gen === sourceGen) bgAiStatus.textContent = m
       },
     })
+    if (gen !== sourceGen) return // 待っている間に元画像が変わった → 結果を捨てる
     sourceImage = cut
     sourceBgCut = true
     lastCutWasAI = true
     sourceJustLoaded = true // 下地が変わったので作り直す
     drawSource()
     scheduleRender()
-    bgAiStatus.hidden = true
     showToast('AIで背景を切り抜きました')
   } catch (err) {
+    if (gen !== sourceGen) return // 元画像が変わった後の失敗は黙って捨てる
     console.error(err)
-    bgAiStatus.hidden = true
     showToast('AI切り抜きに失敗しました（通信/対応環境をご確認ください）。色ベースもお試しください')
   } finally {
     aiBgRunning = false
-    bgSrcAI.disabled = false
-    bgSrcCut.disabled = false
+    bgAiStatus.hidden = true
+    // 元画像が変わっていれば、ボタンの有効/無効は新しい状態側が決めたものを尊重する
+    if (gen === sourceGen) {
+      bgSrcAI.disabled = false
+      bgSrcCut.disabled = false
+    }
   }
 })
 bgSrcReset.addEventListener('click', () => {
@@ -2107,6 +2123,7 @@ bgSrcReset.addEventListener('click', () => {
   }
   sourceBgCut = false
   sourceJustLoaded = true
+  sourceGen++ // 実行中の AI 切り抜きの結果で上書きされないようにする
   drawSource()
   scheduleRender()
   showToast('元画像に戻しました')
@@ -2437,6 +2454,7 @@ async function aiGenerate(): Promise<void> {
       sourceImage = raw
       sourceOriginal = { width: raw.width, height: raw.height, data: raw.data.slice() }
       sourceBgCut = false
+      sourceGen++ // 実行中の AI 切り抜きがあれば、その結果は破棄させる
       bgSrcCut.disabled = false
       bgSrcReset.disabled = false
       bgSrcAI.disabled = false
